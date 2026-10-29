@@ -40,6 +40,7 @@ Project (We keep the project source files here. When we hand the project to some
             task_definition.h/.cpp (Task: name, model, priority, minimum remaining usage, instructions.)
             skill_definition.h/.cpp (Skill: instructions + tools + optional MCP config an agent can be given.)
             skill_templates.h/.cpp (Skill templates built into the program; the default ones are copied into every new vault.)
+            skill_templates_en.cpp (English name/description/body of each template by id; `LocalizedSkill`.)
             vault.h/.cpp (A vault folder: create, open, load/save/delete agents, tasks, skills, rules, projects.)
             vault_registry.h/.cpp (List of known vaults and the last opened one, stored in %APPDATA%\burrow\vaults.ini; takes over the old otomation folder's list once.)
             usage_info.h/.cpp (Remaining Claude usage (5 hour / 7 day) read from rate_limit_event messages.)

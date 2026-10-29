@@ -23,6 +23,7 @@ add_library(burrow_core STATIC
     Source/Core/scheduler.cpp
     Source/Core/skill_definition.cpp
     Source/Core/skill_templates.cpp
+    Source/Core/skill_templates_en.cpp
     Source/Core/task_definition.cpp
     Source/Core/usage_info.cpp
     Source/Core/vault.cpp

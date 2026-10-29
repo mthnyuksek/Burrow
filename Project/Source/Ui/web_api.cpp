@@ -165,7 +165,7 @@ Json WebFrame::Dispatch(const std::string& cmd, const Json& args) {
     if (cmd == "templates.list") {
         Json list = Json::MakeArray();
         for (const SkillTemplate& t : SkillTemplates())
-            list.Push(SkillJson(t.skill));
+            list.Push(SkillJson(LocalizedSkill(t, vault_.Language())));
         return list;
     }
     if (cmd == "rule.save") {

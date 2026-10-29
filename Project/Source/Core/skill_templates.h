@@ -13,3 +13,7 @@ struct SkillTemplate {
 };
 
 const std::vector<SkillTemplate>& SkillTemplates();
+
+// The template with name, description and body in the given vault language ("tr" or "en").
+// Tools and ids are the same in both; a template without an English text stays Turkish.
+SkillDefinition LocalizedSkill(const SkillTemplate& t, const std::string& language);

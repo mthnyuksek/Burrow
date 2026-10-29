@@ -1,5 +1,6 @@
 #include "Core/skill_templates.h"
 
+// English texts: skill_templates_en.cpp (looked up by id, keep both in step).
 namespace {
 SkillTemplate Make(const char* id, const char* name, const char* description, const char* tools,
                    const char* body, bool installed_by_default) {
@@ -40,9 +41,9 @@ Biçim: iki --- satırı arasında üst bilgi, altında ajanın kişiliği ve ka
 ---
 name: Görünen ad
 role: Kısa rol
-mascot_species: 0-4 (Bulut, Kedi, Robot, Ayı, Hayalet)
-mascot_color: 0-7 (Turuncu, Kırmızı, Yeşil, Mavi, Mor, Pembe, Limon, Gri)
-mascot_accessory: 0-3 (Yok, Gözlük, Silindir şapka, Papyon)
+mascot_species: 0-9 (Bulut, Kedi, Robot, Ayı, Hayalet, Tavşan, Baykuş, Kurbağa, Penguen, Ahtapot)
+mascot_color: 0-17 (Turuncu, Kırmızı, Yeşil, Mavi, Mor, Pembe, Limon, Gri, Turkuaz, Sarı, Lacivert; gradyen: Gün batımı, Okyanus, Orman, Aurora, Şeker, Alev, Gece)
+mascot_accessory: 0-7 (Yok, Gözlük, Silindir şapka, Papyon, Taç, Kulaklık, Kovboy şapkası, Çiçek)
 reports_to: bağlı olduğu ajanın id'si (yoksa boş)
 model: haiku, sonnet veya opus (boş = varsayılan)
 enabled: true
