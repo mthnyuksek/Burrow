@@ -1,0 +1,3 @@
+- Read the "Development/workspace_rules.md" file.
+- Before changing anything in the project, read "Development/project_summary.md" first. It describes the architecture, vault format, run flow and known pitfalls, so do not scan the whole source tree to learn them. Open individual source files only for the part you are changing.
+- After a change that alters the architecture, data format, run flow or a pitfall, update "Development/project_summary.md" (and "Development/file_structure.md" when files move). Keep both short.

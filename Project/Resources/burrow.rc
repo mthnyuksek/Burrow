@@ -1,0 +1,28 @@
+#include <winuser.h>
+#include <winver.h>
+
+// Manifest: Windows 10/11 compatibility and per-monitor DPI awareness (the web page stays sharp).
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "burrow.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "FileDescription", "Burrow"
+            VALUE "ProductName", "Burrow"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "OriginalFilename", "burrow.exe"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
