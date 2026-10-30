@@ -2,6 +2,8 @@
 
 #include "Core/text.h"
 
+#include <algorithm>
+
 namespace {
 std::string Snippet(const std::string& body, size_t max_length) {
     const std::string one_line = str::Trim(str::ReplaceAll(body, "\n", " "));
@@ -90,6 +92,10 @@ void ConversationRouter::HandleResult(const TeamContext& team, const RunResult& 
     }
     if (!agent)
         return;
+
+    if (on_telegram && std::find(agent->skills.begin(), agent->skills.end(), kTelegramSkillId) != agent->skills.end())
+        for (const std::string& message : reply.telegram)
+            on_telegram(*agent, message);
 
     // A <send> block aimed at the asker is the same as answering, so it is not routed twice.
     std::string answer = reply.text;

@@ -25,6 +25,7 @@ add_library(burrow_core STATIC
     Source/Core/skill_templates.cpp
     Source/Core/skill_templates_en.cpp
     Source/Core/task_definition.cpp
+    Source/Core/telegram_config.cpp
     Source/Core/usage_info.cpp
     Source/Core/vault.cpp
     Source/Core/vault_registry.cpp
@@ -55,6 +56,7 @@ add_executable(burrow WIN32
     Source/Ui/burrow_app.cpp
     Source/Ui/embedded_web.cpp
     Source/Ui/folder_dialog.cpp
+    Source/Ui/telegram_client.cpp
     Source/Ui/web_api.cpp
     Source/Ui/web_frame.cpp
     Source/Ui/web_view_host.cpp
@@ -63,7 +65,7 @@ add_executable(burrow WIN32
 )
 target_include_directories(burrow PRIVATE Third_Party/Web_View2/Include)
 target_compile_definitions(burrow PRIVATE UNICODE _UNICODE)
-target_link_libraries(burrow PRIVATE burrow_core ole32 oleaut32 shlwapi shell32 uuid dwmapi)
+target_link_libraries(burrow PRIVATE burrow_core ole32 oleaut32 shlwapi shell32 uuid dwmapi winhttp)
 target_link_options(burrow PRIVATE -static)
 
 # Self test of the core: cmake -DBURROW_BUILD_TESTS=ON, run `core_selftest [--live]`.

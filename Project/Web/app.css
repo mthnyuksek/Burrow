@@ -336,3 +336,4 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .vault-create h3 { margin: 0; font-size: 14px; }
 .vault-folder { display: flex; gap: 8px; }
 .vault-folder input { flex: 1; min-width: 0; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; cursor: pointer; }

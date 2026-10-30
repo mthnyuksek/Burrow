@@ -188,6 +188,13 @@ Raporda ajan başına toplam token, çalıştırma sayısı, hata sayısı ve en
         false));
 
     all.push_back(Make(
+        "telegram_bildirim", "Telegram bildirimi",
+        "Ajana kullanıcının Telegram sohbetine mesaj gönderme izni verir (araç gerektirmez, yaklaşık 70 token).", "",
+        R"(Kullanıcıya Telegram'dan haber vermek için cevabına şu bloğu ekle: <telegram>mesaj</telegram>
+Mesaj kısa ve kendi başına anlaşılır olsun (en fazla birkaç cümle). Sadece kullanıcının görmesi gereken şeyler için kullan: bitmiş iş, önemli sonuç, ya da onun kararını bekleyen durum. Her cevapta kullanma. Gönderim uygulamanın Ayarlar sayfasındaki Telegram bilgileriyle yapılır; ayarlı değilse mesaj sessizce gitmez.)",
+        false));
+
+    all.push_back(Make(
         "sohbet_arama", "Sohbet geçmişi arama",
         "Geçmiş sohbetlerde ve ajanlar arası konuşmalarda arama yapar (yazamaz).", "Read, Glob, Grep",
         R"(Konuşmalar kasadaki Conversations/<id>.jsonl dosyalarıdır, her satır bir JSON nesnesidir. Çalışma klasörün kasa klasörüdür.

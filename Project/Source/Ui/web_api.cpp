@@ -4,6 +4,7 @@
 #include "Core/skill_templates.h"
 #include "Core/text.h"
 #include "Ui/folder_dialog.h"
+#include "Ui/telegram_client.h"
 #include "Ui/web_frame.h"
 #include "Ui/web_json.h"
 
@@ -127,6 +128,36 @@ Json WebFrame::Dispatch(const std::string& cmd, const Json& args) {
         return Json();
     }
 
+    if (cmd == "telegram.set") {  // an empty token keeps the saved one
+        TelegramConfig next = telegram_;
+        if (!Trimmed(args["token"]).empty())
+            next.token = Trimmed(args["token"]);
+        if (!args["chat_id"].IsNull())
+            next.chat_id = Trimmed(args["chat_id"]);
+        if (!args["notify_failures"].IsNull())
+            next.notify_failures = args["notify_failures"].AsBool();
+        Require(next.Save(TelegramFile()), "Telegram ayarları kaydedilemedi.");
+        telegram_ = next;
+        PushChanged();
+        return Json();
+    }
+    if (cmd == "telegram.detect") {  // uses the typed token if there is one, else the saved one
+        std::string error;
+        const std::string token = Trimmed(args["token"]).empty() ? telegram_.token : Trimmed(args["token"]);
+        const std::string id = telegram::DetectChatId(token, error);
+        Require(!id.empty(), error.c_str());
+        return IdJson(id);
+    }
+    if (cmd == "telegram.test") {
+        TelegramConfig test = telegram_;
+        if (!Trimmed(args["token"]).empty())
+            test.token = Trimmed(args["token"]);
+        if (!Trimmed(args["chat_id"]).empty())
+            test.chat_id = Trimmed(args["chat_id"]);
+        const std::string error = telegram::Send(test, "Burrow: test mesajı. Telegram bağlantısı çalışıyor ✓");
+        Require(error.empty(), error.c_str());
+        return Json();
+    }
     if (cmd == "settings.set") {
         std::string error;
         auto put = [&](const char* arg, const char* key, std::string value) {

@@ -14,6 +14,7 @@
 #include "Core/run_stats.h"
 #include "Core/scheduler.h"
 #include "Core/skill_templates.h"
+#include "Core/telegram_config.h"
 #include "Core/text.h"
 #include "Core/usage_info.h"
 #include "Core/vault.h"
@@ -331,6 +332,29 @@ void TestReplyParsing() {
     CHECK(r.sends.size() == 1 && r.sends[0].title == "Rapor işi" && r.sends[0].expects_reply);
     r = ParseReply("<send to=\"a\">yarım");
     CHECK(r.sends.empty() && Has(r.text, "<send"));  // broken block is left alone
+
+    // Telegram blocks are cut out of the answer and collected; an unfinished one stays as it is.
+    r = ParseReply("Bitti.<telegram>Rapor hazır</telegram> Sonra <telegram>İkinci</telegram>");
+    CHECK(r.telegram.size() == 2 && r.telegram[0] == "Rapor hazır" && r.telegram[1] == "İkinci");
+    CHECK(Has(r.text, "Bitti.") && !Has(r.text, "telegram"));
+    r = ParseReply("<telegram>yarım");
+    CHECK(r.telegram.empty() && Has(r.text, "<telegram>"));
+}
+
+void TestTelegramConfig() {
+    const std::string dir = FreshDir("burrow_selftest_telegram");
+    fsx::MakeDirs(dir);
+    const std::string file = fsx::Join(dir, "telegram.ini");
+    CHECK(!TelegramConfig::Load(file).Ready());  // no file: not set up
+    TelegramConfig c;
+    c.token = "123:abc";
+    CHECK(!c.Ready());
+    c.chat_id = "-100200";
+    c.notify_failures = true;
+    CHECK(c.Ready() && c.Save(file));
+    const TelegramConfig back = TelegramConfig::Load(file);
+    CHECK(back.token == "123:abc" && back.chat_id == "-100200" && back.notify_failures);
+    fsx::RemoveDirRecursive(dir);
 }
 
 void TestScheduler() {
@@ -618,6 +642,7 @@ int main(int argc, char** argv) {
     TestHierarchy();
     TestSkillTemplates();
     TestVaultLanguage();
+    TestTelegramConfig();
     TestProjects();
     TestUsageStats();
     TestReplyParsing();

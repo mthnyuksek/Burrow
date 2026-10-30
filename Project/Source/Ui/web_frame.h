@@ -10,6 +10,7 @@
 #include "Core/scheduler.h"
 #include "Core/skill_definition.h"
 #include "Core/task_definition.h"
+#include "Core/telegram_config.h"
 #include "Core/vault.h"
 #include "Core/vault_registry.h"
 #include "Ui/web_view_host.h"
@@ -18,6 +19,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -71,6 +73,9 @@ private:
     void OnRunsChanged();
     void OnRunFinished(const RunResult& result);
     void OnSchedulerTick();
+    // Sends text to the user's Telegram chat from a worker thread; the outcome shows in the snapshot.
+    void SendTelegram(const std::string& text);
+    std::string TelegramFile() const;
     void SetScheduler(bool on);
 
     // Commands (web_api.cpp). Throws ApiError for mistakes of the user.
@@ -111,6 +116,13 @@ private:
     std::unique_ptr<ConversationStore> store_;
     std::unique_ptr<ConversationRouter> router_;
     Scheduler scheduler_;
+    TelegramConfig telegram_;  // %APPDATA%urrow	elegram.ini, loaded at start
+    struct TelegramStatus {
+        std::mutex mutex;
+        std::string last_error;  // of the latest background send, empty if it went through
+        bool sent_any = false;
+    };
+    std::shared_ptr<TelegramStatus> telegram_status_ = std::make_shared<TelegramStatus>();
     bool scheduler_on_ = false;
 
     WebViewHost host_;

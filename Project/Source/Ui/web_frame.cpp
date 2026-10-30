@@ -3,12 +3,14 @@
 #include "Core/platform.h"
 #include "Core/run_stats.h"
 #include "Core/text.h"
+#include "Ui/telegram_client.h"
 #include "Ui/web_json.h"
 
 #include <dwmapi.h>
 
 #include <algorithm>
 #include <map>
+#include <thread>
 
 namespace {
 constexpr int kRunTickMs = 120;
@@ -45,6 +47,7 @@ WebFrame::WebFrame(VaultRegistry& registry, const Vault* vault, const std::strin
         vault_ = *vault;
     runs_.on_changed = [this] { OnRunsChanged(); };
     runs_.on_finished = [this](const RunResult& r) { OnRunFinished(r); };
+    telegram_ = TelegramConfig::Load(TelegramFile());
     if (HasVault())
         StartVaultMachinery();
 }
@@ -62,6 +65,9 @@ void WebFrame::StartVaultMachinery() {
     runs_.SetVault(vault_.Root(), vault_.SubDir("Runs"));
     store_ = std::make_unique<ConversationStore>(vault_.SubDir("Conversations"));
     router_ = std::make_unique<ConversationRouter>(store_.get(), &runs_);
+    router_->on_telegram = [this](const AgentDefinition& from, const std::string& text) {
+        SendTelegram(from.name + ": " + text);
+    };
     ReloadAll();
 }
 
@@ -306,6 +312,17 @@ Json WebFrame::Snapshot() const {
     budget.Set("weekly_over", JBool(OverDailyLimit(tokens_7d, static_cast<int>(vault_.WeeklyTokenBudget()))));
     out.Set("budget", budget);
 
+    Json tg = Json::MakeObject();  // the token itself never goes to the page
+    tg.Set("token_set", JBool(!telegram_.token.empty()));
+    tg.Set("chat_id", JStr(telegram_.chat_id));
+    tg.Set("notify_failures", JBool(telegram_.notify_failures));
+    tg.Set("ready", JBool(telegram_.Ready()));
+    {
+        std::lock_guard<std::mutex> lock(telegram_status_->mutex);
+        tg.Set("last_error", JStr(telegram_status_->last_error));
+    }
+    out.Set("telegram", tg);
+
     Json jobs = Json::MakeArray();
     for (const JobInfo& i : runs_.Jobs()) {
         Json jj = Json::MakeObject();
@@ -507,8 +524,25 @@ void WebFrame::OnRunFinished(const RunResult& r) {
     // An agent with a write tool may have changed agents, rules or skills (setup skills): show them.
     if (str::Contains(job.tools, "Write") || str::Contains(job.tools, "Edit"))
         ReloadAll();
+    if (telegram_.notify_failures && job.source == JobSource::Scheduled && r.status == RunStatus::Failed)
+        SendTelegram("⚠ " + job.agent_name + (job.task_name.empty() ? std::string() : " / " + job.task_name) +
+                     " başarısız oldu: " + (str::Utf8Length(r.text) > 300 ? str::Utf8Left(r.text, 300) + "…" : r.text));
     router_->HandleResult(Team(), r);
     PushChanged();
+}
+
+std::string WebFrame::TelegramFile() const { return fsx::Join(fsx::UserDataDir(), "telegram.ini"); }
+
+void WebFrame::SendTelegram(const std::string& text) {
+    if (!telegram_.Ready())
+        return;
+    // The thread owns copies, so it stays safe even if the window closes while it waits for the network.
+    std::thread([config = telegram_, text, status = telegram_status_] {
+        const std::string error = telegram::Send(config, text);
+        std::lock_guard<std::mutex> lock(status->mutex);
+        status->last_error = error;
+        status->sent_any = status->sent_any || error.empty();
+    }).detach();
 }
 
 void WebFrame::SetScheduler(bool on) {

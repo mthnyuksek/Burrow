@@ -72,7 +72,11 @@ struct ParsedReply {
     std::string title;  // from <title>..</title>, empty if there was none
     std::string text;  // the answer without <send> and <title> blocks
     std::vector<SendDirective> sends;
+    std::vector<std::string> telegram;  // <telegram>..</telegram> blocks: messages for the user's Telegram chat
 };
 
-// Finds <send to="agent_id">...</send> blocks in an agent's answer.
+// Skill id that lets an agent message the user on Telegram (see kTelegramSkillId in the router).
+constexpr const char* kTelegramSkillId = "telegram_bildirim";
+
+// Finds <send to="agent_id">...</send> and <telegram>...</telegram> blocks in an agent's answer.
 ParsedReply ParseReply(const std::string& raw);

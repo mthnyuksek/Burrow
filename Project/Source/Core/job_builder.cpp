@@ -209,6 +209,16 @@ ParsedReply ParseReply(const std::string& raw_text) {
         reply.title = str::Trim(raw.substr(title_open + 7, title_close - title_open - 7));
         raw = raw.substr(0, title_open) + raw.substr(title_close + 8);
     }
+    while (true) {  // <telegram> blocks are cut out first, they never reach the transcript
+        const size_t open = raw.find("<telegram>");
+        const size_t close = raw.find("</telegram>");
+        if (open == std::string::npos || close == std::string::npos || close < open)
+            break;
+        const std::string text = str::Trim(raw.substr(open + 10, close - open - 10));
+        if (!text.empty())
+            reply.telegram.push_back(text);
+        raw = raw.substr(0, open) + raw.substr(close + 11);
+    }
     std::string rest = raw;
     std::string kept;
     while (true) {

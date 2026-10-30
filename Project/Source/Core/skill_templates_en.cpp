@@ -155,6 +155,11 @@ Header (between two --- lines): time (start), agent_id, agent_name, task (empty 
 Reading the files one by one is expensive for a report: pull only the lines you need with Grep (e.g. "^tokens:", "^status: hata", "^agent_id:") and add them up. An empty agent_id line is a usage measurement, do not count it as agent work.
 In the report give total tokens per agent, the number of runs, the number of errors and the most expensive jobs in a short table; add concrete advice for saving.)"},
 
+    {"telegram_bildirim", "Telegram notification",
+     "Lets the agent message the user's Telegram chat (needs no tools, about 70 tokens).",
+     R"(To tell the user something on Telegram, add this block to your answer: <telegram>message</telegram>
+Keep the message short and understandable on its own (a few sentences at most). Use it only for things the user needs to see: finished work, an important result, or a situation waiting for their decision. Do not use it in every answer. It is sent with the Telegram details on the app's Settings page; if they are not set, the message does not go out.)"},
+
     {"sohbet_arama", "Search chat history",
      "Searches past chats and conversations between agents (cannot write).",
      R"(Conversations are the Conversations/<id>.jsonl files in the vault, each line is a JSON object. Your working folder is the vault folder.
