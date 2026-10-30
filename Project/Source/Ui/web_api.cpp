@@ -136,15 +136,23 @@ Json WebFrame::Dispatch(const std::string& cmd, const Json& args) {
             next.chat_id = Trimmed(args["chat_id"]);
         if (!args["notify_failures"].IsNull())
             next.notify_failures = args["notify_failures"].AsBool();
+        if (!args["receive"].IsNull())
+            next.receive = args["receive"].AsBool();
+        if (!args["agent_id"].IsNull())
+            next.agent_id = Trimmed(args["agent_id"]);
         Require(next.Save(TelegramFile()), "Telegram ayarları kaydedilemedi.");
         telegram_ = next;
+        RestartTelegramPoller();
         PushChanged();
         return Json();
     }
     if (cmd == "telegram.detect") {  // uses the typed token if there is one, else the saved one
         std::string error;
         const std::string token = Trimmed(args["token"]).empty() ? telegram_.token : Trimmed(args["token"]);
+        if (poller_)
+            poller_->stop = true;  // two readers of the same bot would get in each other's way
         const std::string id = telegram::DetectChatId(token, error);
+        RestartTelegramPoller();
         Require(!id.empty(), error.c_str());
         return IdJson(id);
     }

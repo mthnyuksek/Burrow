@@ -16,11 +16,16 @@ TelegramConfig TelegramConfig::Load(const std::string& file) {
             c.chat_id = str::Trim(line.substr(7));
         else if (str::StartsWith(line, "NotifyFailures="))
             c.notify_failures = str::Trim(line.substr(15)) == "1";
+        else if (str::StartsWith(line, "Receive="))
+            c.receive = str::Trim(line.substr(8)) == "1";
+        else if (str::StartsWith(line, "Agent="))
+            c.agent_id = str::Trim(line.substr(6));
     }
     return c;
 }
 
 bool TelegramConfig::Save(const std::string& file) const {
     return fsx::WriteFile(file, "[Telegram]\nToken=" + token + "\nChatId=" + chat_id +
-                                    "\nNotifyFailures=" + (notify_failures ? "1" : "0") + "\n");
+                                    "\nNotifyFailures=" + (notify_failures ? "1" : "0") + "\nReceive=" +
+                                    (receive ? "1" : "0") + "\nAgent=" + agent_id + "\n");
 }

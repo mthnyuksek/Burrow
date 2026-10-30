@@ -13,11 +13,14 @@
 #include "Core/telegram_config.h"
 #include "Core/vault.h"
 #include "Core/vault_registry.h"
+#include "Ui/telegram_client.h"
 #include "Ui/web_view_host.h"
 
 #include <windows.h>
 
+#include <atomic>
 #include <functional>
+#include <set>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -76,6 +79,10 @@ private:
     // Sends text to the user's Telegram chat from a worker thread; the outcome shows in the snapshot.
     void SendTelegram(const std::string& text);
     std::string TelegramFile() const;
+    // Reading what the chat writes to the bot: a worker thread long-polls and posts kTelegramMessage.
+    void RestartTelegramPoller();  // after a settings change, and once the window exists
+    void OnTelegramInbox();        // UI thread: hands each message to an agent's Telegram chat
+    void HandleTelegramText(const std::string& text);
     void SetScheduler(bool on);
 
     // Commands (web_api.cpp). Throws ApiError for mistakes of the user.
@@ -123,6 +130,14 @@ private:
         bool sent_any = false;
     };
     std::shared_ptr<TelegramStatus> telegram_status_ = std::make_shared<TelegramStatus>();
+    struct TelegramPoller {
+        std::atomic<bool> stop{false};
+        std::mutex mutex;
+        std::vector<telegram::Incoming> inbox;
+        std::string error;  // last polling problem, empty while it works
+    };
+    std::shared_ptr<TelegramPoller> poller_;
+    std::set<std::string> telegram_pending_;  // chats with a Telegram message in work: the answer goes back
     bool scheduler_on_ = false;
 
     WebViewHost host_;

@@ -18,6 +18,7 @@ constexpr int kSchedulerTickMs = 15 * 1000;
 constexpr UINT_PTR kRunTimerId = 1;
 constexpr UINT_PTR kSchedulerTimerId = 2;
 constexpr UINT kCallMessage = WM_APP + 1;
+constexpr UINT kTelegramMessage = WM_APP + 2;
 constexpr wchar_t kWindowClass[] = L"BurrowMainWindow";
 
 constexpr COLORREF kBackground = RGB(15, 17, 23);  // the page's --bg, visible only while it loads
@@ -55,6 +56,8 @@ WebFrame::WebFrame(VaultRegistry& registry, const Vault* vault, const std::strin
 WebFrame::~WebFrame() {
     runs_.on_changed = nullptr;
     runs_.on_finished = nullptr;
+    if (poller_)
+        poller_->stop = true;
     if (hwnd_) {
         SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
         DestroyWindow(hwnd_);
@@ -107,6 +110,7 @@ bool WebFrame::Create() {
 
     UpdateTitle();
     SetTimer(hwnd_, kRunTimerId, kRunTickMs, nullptr);
+    RestartTelegramPoller();
 
     host_.on_message = [this](const std::string& body) {
         Post([this, body] { OnPageMessage(body); });  // leave the WebView2 callback first
@@ -168,6 +172,9 @@ LRESULT WebFrame::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
                 runs_.Tick();
             else if (wparam == kSchedulerTimerId)
                 OnSchedulerTick();
+            return 0;
+        case kTelegramMessage:
+            OnTelegramInbox();
             return 0;
         case kCallMessage: {
             std::unique_ptr<std::function<void()>> fn(reinterpret_cast<std::function<void()>*>(lparam));
@@ -317,6 +324,14 @@ Json WebFrame::Snapshot() const {
     tg.Set("chat_id", JStr(telegram_.chat_id));
     tg.Set("notify_failures", JBool(telegram_.notify_failures));
     tg.Set("ready", JBool(telegram_.Ready()));
+    tg.Set("receive", JBool(telegram_.receive));
+    tg.Set("agent_id", JStr(telegram_.agent_id));
+    std::string receive_error;
+    if (poller_) {
+        std::lock_guard<std::mutex> lock(poller_->mutex);
+        receive_error = poller_->error;
+    }
+    tg.Set("receive_error", JStr(receive_error));
     {
         std::lock_guard<std::mutex> lock(telegram_status_->mutex);
         tg.Set("last_error", JStr(telegram_status_->last_error));
@@ -528,6 +543,13 @@ void WebFrame::OnRunFinished(const RunResult& r) {
         SendTelegram("⚠ " + job.agent_name + (job.task_name.empty() ? std::string() : " / " + job.task_name) +
                      " başarısız oldu: " + (str::Utf8Length(r.text) > 300 ? str::Utf8Left(r.text, 300) + "…" : r.text));
     router_->HandleResult(Team(), r);
+    // The answer to a message that came from Telegram goes back there (once, the chain's final answer).
+    if (!job.reply_stack.empty() && job.reply_stack.back().agent_id == "user" &&
+        telegram_pending_.erase(job.reply_stack.back().conversation_id) > 0) {
+        const std::string answer = r.status == RunStatus::Done ? ParseReply(r.text).text
+                                                               : "(" + RunStatusLabel(r.status) + ") " + r.text;
+        SendTelegram(answer.empty() ? std::string("(boş cevap)") : answer);
+    }
     PushChanged();
 }
 
@@ -543,6 +565,101 @@ void WebFrame::SendTelegram(const std::string& text) {
         status->last_error = error;
         status->sent_any = status->sent_any || error.empty();
     }).detach();
+}
+
+void WebFrame::RestartTelegramPoller() {
+    if (poller_)
+        poller_->stop = true;  // the old thread notices within one poll and ends
+    poller_.reset();
+    if (!telegram_.Ready() || !telegram_.receive)
+        return;
+    poller_ = std::make_shared<TelegramPoller>();
+    std::thread([poller = poller_, token = telegram_.token, hwnd = hwnd_] {
+        long long offset = -1;  // the first call only learns where the newest message is: no backlog
+        std::vector<telegram::Incoming> messages;
+        while (!poller->stop) {
+            std::string error;
+            long long next = offset;
+            const bool ok = telegram::GetUpdates(token, offset, offset < 0 ? 0 : 8, messages, next, error);
+            if (poller->stop)
+                break;
+            {
+                std::lock_guard<std::mutex> lock(poller->mutex);
+                poller->error = ok ? std::string() : error;
+                for (const telegram::Incoming& m : messages)
+                    poller->inbox.push_back(m);
+            }
+            if (ok) {
+                offset = next < 0 ? 0 : next;
+                if (!messages.empty())
+                    PostMessageW(hwnd, kTelegramMessage, 0, 0);
+            } else {
+                for (int waited = 0; waited < 5000 && !poller->stop; waited += 100)
+                    Sleep(100);  // a failed poll (offline, conflict) is retried in a few seconds
+            }
+        }
+    }).detach();
+}
+
+void WebFrame::OnTelegramInbox() {
+    if (!poller_)
+        return;
+    std::vector<telegram::Incoming> inbox;
+    {
+        std::lock_guard<std::mutex> lock(poller_->mutex);
+        inbox.swap(poller_->inbox);
+    }
+    for (const telegram::Incoming& m : inbox)
+        if (m.chat_id == telegram_.chat_id)  // only the chat set up in Settings may talk to the agents
+            HandleTelegramText(m.text);
+}
+
+// One message from the chat: it goes to an agent's own "Telegram" chat (made on first use), and the
+// answer is sent back to Telegram when the job ends (OnRunFinished).
+void WebFrame::HandleTelegramText(const std::string& raw) {
+    std::string text = str::Trim(raw);
+    if (text.empty() || !HasVault())
+        return;
+    std::string agent_id = telegram_.agent_id;
+    if (text[0] == '@') {  // "@ajan_id mesaj" talks to another agent
+        const std::string wanted = str::BeforeFirst(text.substr(1), ' ');
+        for (const AgentDefinition& a : agents_)
+            if (a.id == wanted) {
+                agent_id = wanted;
+                text = str::Trim(text.substr(1 + wanted.size()));
+            }
+    }
+    const TeamContext team = Team();
+    const AgentDefinition* agent = team.FindAgent(agent_id);
+    if (!agent || !agent->enabled) {
+        SendTelegram("Bu mesajı alacak ajan seçilmemiş ya da uykuda. Burrow Ayarlar sayfasından bir ajan seç; ya da mesaja @ajan_id ile başla.");
+        return;
+    }
+    if (text.empty())
+        return;
+
+    std::string conversation;
+    for (const ConversationInfo& c : store_->List())
+        if (c.kind == "chat" && !c.participants.empty() && c.participants[0] == agent->id &&
+            str::StartsWith(c.title, "Telegram")) {
+            conversation = c.id;
+            break;
+        }
+    if (conversation.empty())
+        conversation = store_->Create("chat", "Telegram · " + agent->name, {agent->id});
+    if (runs_.IsConversationActive(conversation)) {
+        SendTelegram("Önceki mesajın hâlâ işleniyor, bitince tekrar yaz.");
+        return;
+    }
+    ConversationInfo info;
+    std::vector<ConvMessage> messages;
+    store_->Load(conversation, info, messages);
+    store_->Append(conversation, {std::string(), "user", agent->id, text});
+    RunJob job = MakeChatJob(team, *agent, conversation, info.session_id, text, info.project, false);
+    job.prompt += "\n\n(Bu mesaj Telegram'dan geldi; cevabın Telegram'a iletilecek, kısa tut.)";
+    telegram_pending_.insert(conversation);
+    runs_.Enqueue(job);
+    PushChanged();
 }
 
 void WebFrame::SetScheduler(bool on) {

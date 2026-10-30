@@ -34,7 +34,7 @@ std::string UrlEncode(const std::string& s) {
 // One HTTPS request to api.telegram.org. Returns false with `error` set when it could not be made;
 // otherwise `body` holds the answer (Telegram answers errors with JSON too).
 bool Request(const std::string& token, const std::string& method, const std::string& form, std::string& body,
-             std::string& error) {
+             std::string& error, int receive_ms = kReceiveMs) {
     body.clear();
     HINTERNET session = WinHttpOpen(L"burrow", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME,
                                     WINHTTP_NO_PROXY_BYPASS, 0);
@@ -42,7 +42,7 @@ bool Request(const std::string& token, const std::string& method, const std::str
         error = "İnternet bağlantısı başlatılamadı.";
         return false;
     }
-    WinHttpSetTimeouts(session, kResolveMs, kConnectMs, kSendMs, kReceiveMs);
+    WinHttpSetTimeouts(session, kResolveMs, kConnectMs, kSendMs, receive_ms);
     HINTERNET connection = WinHttpConnect(session, L"api.telegram.org", INTERNET_DEFAULT_HTTPS_PORT, 0);
     HINTERNET request = nullptr;
     bool ok = false;
@@ -122,6 +122,34 @@ std::string DetectChatId(const std::string& token, std::string& error) {
     }
     error = "Bota henüz mesaj gelmemiş: Telegram'da botuna bir mesaj yaz, sonra tekrar dene.";
     return std::string();
+}
+
+bool GetUpdates(const std::string& token, long long offset, int wait_seconds, std::vector<Incoming>& messages,
+                long long& next_offset, std::string& error) {
+    messages.clear();
+    std::string body;
+    const std::string form = "offset=" + std::to_string(offset) + "&limit=20&timeout=" + std::to_string(wait_seconds) +
+                             "&allowed_updates=%5B%22message%22%5D";
+    if (!Request(token, "getUpdates", form, body, error, (wait_seconds + 10) * 1000))
+        return false;
+    Json answer;
+    if (!Json::Parse(body, answer)) {
+        error = "Telegram'dan anlaşılmaz cevap geldi.";
+        return false;
+    }
+    error = ErrorOf(answer);
+    if (!error.empty())
+        return false;
+    const Json& updates = answer["result"];
+    for (size_t i = 0; i < updates.Size(); ++i) {
+        const Json& update = updates.At(i);
+        next_offset = static_cast<long long>(update["update_id"].AsNumber()) + 1;
+        const Json& message = update["message"];
+        if (offset < 0 || message["text"].AsString().empty() || message["chat"]["id"].type() != Json::Type::Number)
+            continue;
+        messages.push_back({str::Format("%.0f", message["chat"]["id"].AsNumber()), message["text"].AsString()});
+    }
+    return true;
 }
 
 }  // namespace telegram

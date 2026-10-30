@@ -46,9 +46,11 @@ export default function create() {
   const tgToken = h('input', { type: 'password', autocomplete: 'off' });
   const tgChat = h('input', { type: 'text', placeholder: tr('örn. 123456789') });
   const tgFail = h('input', { type: 'checkbox' });
+  const tgRecv = h('input', { type: 'checkbox' });
+  const tgAgent = h('select');
   const tgStatus = h('div', { class: 'hint' });
   let tgLoaded = '';
-  const tgArgs = () => ({ token: tgToken.value, chat_id: tgChat.value, notify_failures: tgFail.checked });
+  const tgArgs = () => ({ token: tgToken.value, chat_id: tgChat.value, notify_failures: tgFail.checked, receive: tgRecv.checked, agent_id: tgAgent.value });
 
   async function tgFind() {
     try { const { id } = await call('telegram.detect', { token: tgToken.value }); tgChat.value = id; toast(tr('Sohbet kimliği bulundu.')); } catch (e) { showError(e); }
@@ -65,6 +67,8 @@ export default function create() {
     field(tr('Bot jetonu'), tgToken),
     field(tr('Sohbet kimliği'), h('div', { style: { display: 'flex', gap: '8px' } }, tgChat, button(tr('Sohbet kimliğini bul'), { onClick: tgFind }))),
     h('label', { class: 'check-row' }, tgFail, ' ', tr('Zamanlı bir iş başarısız olursa bana haber ver')),
+    h('label', { class: 'check-row' }, tgRecv, ' ', tr('Telegram\'dan gelen mesajları oku ve ajana ilet')),
+    field(tr('Mesajları alan ajan'), tgAgent, tr('Cevap Telegram\'a geri gönderilir. Mesaja @ajan_id ile başlarsan başka bir ajanla konuşursun. Yalnızca yukarıdaki sohbet kimliğinin mesajları işlenir; uygulama kapalıyken yazılanlar okunmaz.')),
     tgStatus,
     h('div', { style: { display: 'flex', gap: '8px', marginTop: '10px' } },
       button(tr('Kaydet'), { kind: 'primary', onClick: tgSave }), button(tr('Test mesajı gönder'), { onClick: tgTest })));
@@ -88,10 +92,16 @@ export default function create() {
         daily.value = v.daily_budget; weekly.value = v.weekly_budget;
       }
       const tg = snap.telegram;
-      const tgSig = JSON.stringify([tg.chat_id, tg.notify_failures]);
-      if (tgSig !== tgLoaded && document.activeElement?.tagName !== 'INPUT') { tgLoaded = tgSig; tgChat.value = tg.chat_id; tgFail.checked = tg.notify_failures; }
+      const tgSig = JSON.stringify([tg.chat_id, tg.notify_failures, tg.receive, tg.agent_id, snap.agents.map((a) => a.id)]);
+      if (tgSig !== tgLoaded && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
+        tgLoaded = tgSig; tgChat.value = tg.chat_id; tgFail.checked = tg.notify_failures; tgRecv.checked = tg.receive;
+        tgAgent.replaceChildren(h('option', { value: '' }, tr('(seçilmedi)')), ...snap.agents.filter((a) => a.enabled).map((a) => h('option', { value: a.id }, a.name)));
+        tgAgent.value = tg.agent_id;
+      }
       tgToken.placeholder = tg.token_set ? tr('kayıtlı (değiştirmek için yeni jeton yaz)') : tr('123456:ABC...');
-      tgStatus.textContent = tg.last_error ? tr('Son gönderim başarısız: {e}', { e: tg.last_error }) : tg.ready ? tr('Telegram hazır.') : tr('Henüz ayarlanmadı.');
+      tgStatus.textContent = tg.last_error ? tr('Son gönderim başarısız: {e}', { e: tg.last_error })
+        : tg.receive_error ? tr('Mesajlar okunamıyor: {e}', { e: tg.receive_error })
+        : tg.ready ? (tg.receive ? tr('Telegram hazır, gelen mesajlar okunuyor.') : tr('Telegram hazır.')) : tr('Henüz ayarlanmadı.');
       usageNote.textContent = tr('Şu ana kadar: bugün {a}, son 7 gün {b} token.', { a: fmtTokens(snap.budget.tokens_today), b: fmtTokens(snap.budget.tokens_7d) });
       info.replaceChildren(kv([[tr('Kasa adı'), snap.vault.name], [tr('Kasa klasörü'), snap.vault.root]]));
     },

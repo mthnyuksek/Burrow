@@ -351,9 +351,12 @@ void TestTelegramConfig() {
     CHECK(!c.Ready());
     c.chat_id = "-100200";
     c.notify_failures = true;
+    c.receive = true;
+    c.agent_id = "ayse";
     CHECK(c.Ready() && c.Save(file));
     const TelegramConfig back = TelegramConfig::Load(file);
     CHECK(back.token == "123:abc" && back.chat_id == "-100200" && back.notify_failures);
+    CHECK(back.receive && back.agent_id == "ayse" && !TelegramConfig().receive);
     fsx::RemoveDirRecursive(dir);
 }
 
