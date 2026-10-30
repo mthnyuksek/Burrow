@@ -234,7 +234,6 @@ export default {
   'Yeniden adlandır': 'Rename',
   'Markdown olarak dışa aktar': 'Export as Markdown',
   'Henüz mesaj yok. İlk mesajı sen yaz.': 'No messages yet. Write the first one.',
-  'Ajanlar konuşuyor': 'Agents are talking',
   '{name} yazıyor': '{name} is typing',
   '{name} yazıyor…': '{name} is typing…',
   'Ajanlar arası konuşma salt okunur: ajanlar kendi aralarında yazışır.': 'Conversations between agents are read-only: the agents write to each other on their own.',

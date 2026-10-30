@@ -230,14 +230,13 @@ Json WebFrame::ChatList() const {
         j.Set("project_name", JStr(ProjectName(c.project)));
         j.Set("updated", JStr(c.updated));
         Json people = Json::MakeArray();
-        bool active = c.kind == "chat" ? runs_.IsConversationActive(c.id) : false;
+        bool active = c.kind == "chat" ? runs_.IsConversationActive(c.id)
+                                       : !runs_.ConversationWriters(c.id).empty();
         for (const std::string& p : c.participants) {
             Json pj = Json::MakeObject();
             pj.Set("id", JStr(p));
             pj.Set("name", JStr(NameOf(p)));
             people.Push(pj);
-            if (c.kind != "chat")
-                active = active || runs_.IsAgentBusy(p);
         }
         j.Set("participants", people);
         j.Set("active", JBool(active));
@@ -278,12 +277,17 @@ Json WebFrame::ChatLoad(const std::string& id) const {
     }
     out.Set("messages", msgs);
 
-    bool busy = false;
-    if (info.kind == "chat")
-        busy = runs_.IsConversationActive(id);
-    else
-        for (const std::string& p : info.participants)
-            busy = busy || runs_.IsAgentBusy(p);
+    // "writers" = agents currently composing a message for this very conversation.
+    Json writers = Json::MakeArray();
+    for (const std::string& w : runs_.ConversationWriters(id)) {
+        Json wj = Json::MakeObject();
+        wj.Set("id", JStr(w));
+        wj.Set("name", JStr(NameOf(w)));
+        writers.Push(wj);
+    }
+    out.Set("writers", writers);
+    const bool busy = info.kind == "chat" ? runs_.IsConversationActive(id)
+                                          : !runs_.ConversationWriters(id).empty();
     out.Set("busy", JBool(busy));
     out.Set("writable", JBool(info.kind == "chat" && !busy));
     return out;

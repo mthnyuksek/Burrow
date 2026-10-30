@@ -52,6 +52,7 @@ Page -> program: `chrome.webview.postMessage({id, cmd, args})`, answered `{id, o
 ## Overview, filters, budgets (all token-free, computed from files)
 - Overview tab (`Web/pages/overview.js`): agent states, tokens today / last 7 days per agent, failures, latest runs. Numbers come from `Core/run_stats` over the cached `WebFrame::run_records_` (reloaded when a run ends).
 - Per-agent `daily_tokens` (agent file, 0 = unlimited): scheduled wake-ups are skipped once today's tokens reach it. Chats and manual runs are never blocked.
+- Typing indicator in the Chats tab: `RunManager::ConversationWriters(conv_id)` = agents whose queued/running job writes into that conversation (`job.ConversationId()` = `reply_stack.back()`). `chat.load` returns `writers` (`[{id,name}]`) and `busy`; the page shows the first writer's avatar and "{name} yazıyor". Agent-to-agent conversations are busy only when a writer targets that very conversation (not whenever a participant is busy elsewhere). A user chat stays busy (composer locked) while any frame of a job's reply stack is that chat; if no writer targets it (agent waits for a colleague) the page falls back to the chat's agent.
 - Chats tab filters (kind: all / mine / agents only, agent, project, text search) live in `Web/pages/chats.js`, which receives all conversations and shows the ones that pass. Chats can be renamed (a `title` line is appended to the .jsonl, newest wins) and exported as Markdown.
 
 ## Token saving (the point of the project)

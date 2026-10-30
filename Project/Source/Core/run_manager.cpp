@@ -102,6 +102,20 @@ bool RunManager::IsConversationActive(const std::string& conversation_id) const 
     return std::any_of(queue_.begin(), queue_.end(), involves);
 }
 
+std::vector<std::string> RunManager::ConversationWriters(const std::string& conversation_id) const {
+    std::vector<std::string> ids;
+    auto add = [&](const RunJob& job) {
+        if (job.ConversationId() == conversation_id &&
+            std::find(ids.begin(), ids.end(), job.agent_id) == ids.end())
+            ids.push_back(job.agent_id);
+    };
+    for (const auto& a : active_)
+        add(a->job);
+    for (const RunJob& j : queue_)
+        add(j);
+    return ids;
+}
+
 std::vector<std::string> RunManager::BusyAgents() const {
     std::vector<std::string> ids;
     for (const auto& a : active_)

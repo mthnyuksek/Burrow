@@ -126,7 +126,7 @@ export default function create() {
   }
 
   function drawConversation(forceScroll) {
-    const sig = conv ? `${conv.id}|${conv.messages.length}|${conv.busy}|${conv.title}` : 'none';
+    const sig = conv ? `${conv.id}|${conv.messages.length}|${conv.busy}|${(conv.writers || []).map((w) => w.id).join(',')}|${conv.title}` : 'none';
     if (sig === lastSig && !forceScroll) return;
     const nearBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 80;
     const switched = !lastSig.startsWith(conv ? `${conv.id}|` : 'none');
@@ -152,8 +152,10 @@ export default function create() {
     if (!conv.messages.length) transcript.append(h('div', { class: 'empty', style: { margin: 'auto' } }, tr('Henüz mesaj yok. İlk mesajı sen yaz.')));
     for (const m of conv.messages) transcript.append(bubble(m, between));
     if (conv.busy) {
-      transcript.append(h('div', { class: 'typing' }, avatar(conv.participants[0]?.id, 34),
-        h('span', null, between ? tr('Ajanlar konuşuyor') : tr('{name} yazıyor', { name: conv.participants[0]?.name })), h('span', { class: 'dots' }, h('span'), h('span'), h('span'))));
+      // Show whoever is writing into this conversation; a chat whose agent waits for a colleague still shows the chat's agent.
+      const writers = conv.writers?.length ? conv.writers : conv.participants.slice(0, 1);
+      transcript.append(h('div', { class: 'typing' }, avatar(writers[0]?.id, 34),
+        h('span', null, tr('{name} yazıyor', { name: writers.map((w) => w.name).join(', ') })), h('span', { class: 'dots' }, h('span'), h('span'), h('span'))));
     }
     if (forceScroll || switched || nearBottom) transcript.scrollTop = transcript.scrollHeight;
 

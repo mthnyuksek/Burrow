@@ -96,6 +96,8 @@ public:
     bool IsAgentBusy(const std::string& agent_id) const;
     // True while a queued or running job still has to write into this conversation.
     bool IsConversationActive(const std::string& conversation_id) const;
+    // Agents whose queued or running job will write its answer into exactly this conversation.
+    std::vector<std::string> ConversationWriters(const std::string& conversation_id) const;
     std::vector<std::string> BusyAgents() const;
 
     int max_concurrent = 1;  // a subscription has a shared limit, so keep this low
