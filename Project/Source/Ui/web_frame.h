@@ -95,6 +95,7 @@ private:
     Json RunList() const;
     void RunNow(const std::string& agent_id, const std::string& task_id, const std::string& project_id);
     void SaveAgent(const Json& j);
+    void RemoveWakeup(const std::string& agent_id, const Wakeup& wakeup);  // one-time wake-up that ran
     void DeleteAgent(const std::string& id);
     void SaveTask(const Json& j);
     void SaveSkill(const Json& j);

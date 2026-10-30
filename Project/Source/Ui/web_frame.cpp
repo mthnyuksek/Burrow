@@ -410,6 +410,7 @@ Json WebFrame::Snapshot() const {
             wj.Set("time", JStr(w.time));
             wj.Set("interval", JNum(w.interval_minutes));
             wj.Set("days", JNum(w.days));
+            wj.Set("date", JStr(w.date));
             wj.Set("task", JStr(w.task_id));
             wj.Set("project", JStr(w.project_id));
             wj.Set("text", JStr(w.Describe()));
@@ -705,6 +706,24 @@ void WebFrame::SetScheduler(bool on) {
     }
 }
 
+void WebFrame::RemoveWakeup(const std::string& agent_id, const Wakeup& wakeup) {
+    for (AgentDefinition a : agents_) {
+        if (a.id != agent_id)
+            continue;
+        const auto it = std::find_if(a.wakeups.begin(), a.wakeups.end(),
+                                     [&](const Wakeup& w) { return w.Serialize() == wakeup.Serialize(); });
+        if (it == a.wakeups.end())
+            return;
+        a.wakeups.erase(it);
+        std::string error;
+        if (vault_.SaveAgent(a, error)) {
+            ReloadAll();
+            PushChanged();
+        }
+        return;
+    }
+}
+
 void WebFrame::OnSchedulerTick() {
     if (!HasVault())
         return;
@@ -732,5 +751,7 @@ void WebFrame::OnSchedulerTick() {
         if (!due.wakeup.project_id.empty() && !team.FindProject(due.wakeup.project_id))
             continue;  // the project was deleted
         runs_.Enqueue(MakeTaskJob(team, *agent, task, JobSource::Scheduled, due.wakeup.project_id));
+        if (!due.wakeup.date.empty())
+            RemoveWakeup(agent->id, due.wakeup);  // one-time: done
     }
 }

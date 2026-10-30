@@ -377,6 +377,24 @@ void TestWeekdayWakeups() {
     CHECK(s.Collect({a}, timeutil::Make(2026, 11, 7, 9, 3, 0)).size() == 1);
 }
 
+void TestOneTimeWakeup() {
+    Wakeup w;
+    CHECK(Wakeup::Parse("2026-11-05 14:30 | t", w) && w.date == "2026-11-05" && w.time == "14:30" && w.days == 0 &&
+          w.Serialize() == "2026-11-05 14:30 | t" && w.Describe() == "2026-11-05 14:30");
+    CHECK(!Wakeup::Parse("2026-13-05 14:30 | t", w));
+    Wakeup::Parse("2026-11-05 14:30 | t", w);
+    AgentDefinition a;
+    a.id = "a";
+    a.wakeups = {w};
+    Scheduler s;
+    s.Reset(timeutil::Make(2026, 11, 5, 8, 0, 0));
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 5, 14, 29, 0)).empty());
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 5, 14, 31, 0)).size() == 1);
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 5, 14, 32, 0)).size() == 1);  // stays due until the owner removes it
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 5, 14, 50, 0)).empty());      // missed: not replayed late
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 6, 14, 31, 0)).empty());
+}
+
 void TestScheduler() {
     AgentDefinition a;
     a.id = "a";
@@ -668,6 +686,7 @@ int main(int argc, char** argv) {
     TestReplyParsing();
     TestScheduler();
     TestWeekdayWakeups();
+    TestOneTimeWakeup();
     TestConversationsAndJobs();
     TestProcess();
     std::printf("offline: %d passed, %d failed\n", g_passes, g_failures);

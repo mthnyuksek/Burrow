@@ -53,7 +53,7 @@ reports_to: bağlı olduğu ajanın id'si (yoksa boş)
 model: haiku, sonnet veya opus (boş = varsayılan)
 enabled: true
 skill: yetenek_id (her yetenek için ayrı satır; id = Skills/ klasöründeki dosya adı)
-wake: 09:00 | gorev_id (isteğe bağlı; "every 30 | gorev_id" = 30 dakikada bir; "mon,wed 09:00 | gorev_id" = yalnızca o günlerde (mon tue wed thu fri sat sun); gorev_id boş olabilir)
+wake: 09:00 | gorev_id (isteğe bağlı; "every 30 | gorev_id" = 30 dakikada bir; "mon,wed 09:00 | gorev_id" = yalnızca o günlerde (mon tue wed thu fri sat sun); "2026-11-05 14:30 | gorev_id" = tek seferlik, çalışınca satır silinir; gorev_id boş olabilir)
 ---
 Görev dosyası Tasks/<id>.md: name, model, priority (0 düşük, 1 normal, 2 yüksek), min_remaining_percent, altında talimat.
 Düzenlerken dosyayı oku, Edit ile sadece ilgili satırı değiştir. Ajanı devre dışı bırakmak için enabled: false yaz.

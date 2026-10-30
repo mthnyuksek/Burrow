@@ -3,6 +3,8 @@
 #include "Core/platform.h"
 #include "Core/text.h"
 
+#include <cstdio>
+
 void Scheduler::Reset(time_t now) {
     last_fired_.clear();
     reset_at_ = now;
@@ -22,6 +24,18 @@ std::vector<Scheduler::Due> Scheduler::Collect(const std::vector<AgentDefinition
                     last_fired_[key] = now;
                     due.push_back({agent.id, w});
                 }
+                continue;
+            }
+            if (!w.date.empty()) {
+                // One-time: stays due for the grace window until the caller ran it and removed it.
+                int y = 0, mo = 0, d = 0;
+                long oh = 0, om = 0;
+                if (std::sscanf(w.date.c_str(), "%d-%d-%d", &y, &mo, &d) != 3 ||
+                    !str::ToLong(str::BeforeFirst(w.time, ':'), oh) || !str::ToLong(str::AfterFirst(w.time, ':'), om))
+                    continue;
+                const time_t at = timeutil::Make(y, mo, d, static_cast<int>(oh), static_cast<int>(om), 0);
+                if (now >= at && now - at < static_cast<time_t>(kGraceMinutes) * 60 && at >= reset_at_)
+                    due.push_back({agent.id, w});
                 continue;
             }
             if (!w.RunsOn(timeutil::Weekday(now)))

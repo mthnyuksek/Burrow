@@ -4,6 +4,7 @@
 #include "Core/text.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <set>
 
 namespace {
@@ -22,12 +23,16 @@ std::string DayList(int days, const char* const* names) {
 std::string Wakeup::Describe() const {
     if (interval_minutes > 0)
         return str::Format("her %d dk", interval_minutes);
+    if (!date.empty())
+        return date + " " + time;
     return days == 0 ? time : DayList(days, kDayNamesTr) + " " + time;
 }
 
 std::string Wakeup::Serialize() const {
     std::string when = interval_minutes > 0 ? str::Format("every %d", interval_minutes) : time;
-    if (interval_minutes <= 0 && days != 0)
+    if (interval_minutes <= 0 && !date.empty())
+        when = date + " " + time;
+    else if (interval_minutes <= 0 && days != 0)
         when = DayList(days, kDayKeys) + " " + time;
     return when + " | " + task_id + (project_id.empty() ? std::string() : " | " + project_id);
 }
@@ -49,10 +54,13 @@ bool Wakeup::Parse(const std::string& line, Wakeup& out) {
             return false;
         w.interval_minutes = static_cast<int>(n);
     } else {
-        // "09:00" or "mon,wed 09:00"
+        // "09:00", "mon,wed 09:00" or "2026-11-05 09:00"
         const size_t space = when.find(' ');
         std::string clock = when;
-        if (space != std::string::npos) {
+        if (space != std::string::npos && IsValidDate(when.substr(0, space))) {
+            w.date = when.substr(0, space);
+            clock = str::Trim(when.substr(space + 1));
+        } else if (space != std::string::npos) {
             clock = str::Trim(when.substr(space + 1));
             for (const std::string& d : str::Split(when.substr(0, space), ',')) {
                 int bit = -1;
@@ -72,6 +80,13 @@ bool Wakeup::Parse(const std::string& line, Wakeup& out) {
     }
     out = w;
     return true;
+}
+
+bool Wakeup::IsValidDate(const std::string& iso) {
+    int y = 0, m = 0, d = 0;
+    char tail = 0;
+    return iso.size() == 10 && std::sscanf(iso.c_str(), "%d-%d-%d%c", &y, &m, &d, &tail) == 3 && y >= 2000 &&
+           y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31;
 }
 
 bool Wakeup::IsValidTime(const std::string& hhmm) {

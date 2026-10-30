@@ -459,7 +459,9 @@ void WebFrame::SaveAgent(const Json& j) {
         w.interval_minutes = std::max(0, WInt(wj["interval"]));
         w.task_id = WStr(wj["task"]);
         w.project_id = WStr(wj["project"]);
-        w.days = w.interval_minutes > 0 ? 0 : std::clamp(WInt(wj["days"]), 0, 127);
+        w.date = w.interval_minutes > 0 ? std::string() : Trimmed(wj["date"]);
+        Require(w.date.empty() || Wakeup::IsValidDate(w.date), "Uyanış tarihi geçersiz.");
+        w.days = w.interval_minutes > 0 || !w.date.empty() ? 0 : std::clamp(WInt(wj["days"]), 0, 127);
         if (w.days == 127)
             w.days = 0;
         Require(w.interval_minutes > 0 || Wakeup::IsValidTime(w.time), "Uyanış saati SS:DD biçiminde olmalı.");
