@@ -69,7 +69,8 @@ void WebFrame::StartVaultMachinery() {
     store_ = std::make_unique<ConversationStore>(vault_.SubDir("Conversations"));
     router_ = std::make_unique<ConversationRouter>(store_.get(), &runs_);
     router_->on_telegram = [this](const AgentDefinition& from, const std::string& text) {
-        SendTelegram(from.name + ": " + text);
+        if (!suppress_telegram_)
+            SendTelegram(from.name + ": " + text);
     };
     ReloadAll();
 }
@@ -542,7 +543,12 @@ void WebFrame::OnRunFinished(const RunResult& r) {
     if (telegram_.notify_failures && job.source == JobSource::Scheduled && r.status == RunStatus::Failed)
         SendTelegram("⚠ " + job.agent_name + (job.task_name.empty() ? std::string() : " / " + job.task_name) +
                      " başarısız oldu: " + (str::Utf8Length(r.text) > 300 ? str::Utf8Left(r.text, 300) + "…" : r.text));
+    // An answer headed for Telegram already is the message; its own <telegram> blocks would arrive twice.
+    const bool answers_telegram = !job.reply_stack.empty() && job.reply_stack.back().agent_id == "user" &&
+                                  telegram_pending_.count(job.reply_stack.back().conversation_id) > 0;
+    suppress_telegram_ = answers_telegram;
     router_->HandleResult(Team(), r);
+    suppress_telegram_ = false;
     // The answer to a message that came from Telegram goes back there (once, the chain's final answer).
     if (!job.reply_stack.empty() && job.reply_stack.back().agent_id == "user" &&
         telegram_pending_.erase(job.reply_stack.back().conversation_id) > 0) {

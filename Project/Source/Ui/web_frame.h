@@ -137,6 +137,7 @@ private:
         std::string error;  // last polling problem, empty while it works
     };
     std::shared_ptr<TelegramPoller> poller_;
+    bool suppress_telegram_ = false;  // while the router handles an answer that goes to Telegram anyway
     std::set<std::string> telegram_pending_;  // chats with a Telegram message in work: the answer goes back
     bool scheduler_on_ = false;
 
