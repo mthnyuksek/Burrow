@@ -553,9 +553,10 @@ void WebFrame::OnRunFinished(const RunResult& r) {
     suppress_telegram_ = answers_telegram;
     router_->HandleResult(Team(), r);
     suppress_telegram_ = false;
-    // The answer to a message that came from Telegram goes back there (once, the chain's final answer).
+    // Every answer written into a chat that Telegram started goes back there, including the one an agent
+    // gives while it still waits for a colleague. The chat stays "pending" until no job needs it any more.
     if (!job.reply_stack.empty() && job.reply_stack.back().agent_id == "user" &&
-        telegram_pending_.erase(job.reply_stack.back().conversation_id) > 0) {
+        telegram_pending_.count(job.reply_stack.back().conversation_id) > 0) {
         // Send exactly what the router wrote into the chat, so Burrow and Telegram never differ.
         ConversationInfo info;
         std::vector<ConvMessage> written;
@@ -564,6 +565,8 @@ void WebFrame::OnRunFinished(const RunResult& r) {
             written.back().from == job.agent_id && written.back().to == "user")
             answer = written.back().text;
         SendTelegram(answer.empty() ? std::string("(boş cevap)") : answer);
+        if (!runs_.IsConversationActive(job.reply_stack.back().conversation_id))
+            telegram_pending_.erase(job.reply_stack.back().conversation_id);
     }
     PushChanged();
 }
