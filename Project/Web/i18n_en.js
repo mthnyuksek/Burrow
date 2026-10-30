@@ -411,7 +411,7 @@ export default {
   'Mesajlar okunamıyor: {e}': 'Cannot read messages: {e}',
   'Telegram\'dan gelen mesajları oku ve ajana ilet': 'Read messages from Telegram and pass them to an agent',
   'Mesajları alan ajan': 'Agent that receives the messages',
-  'Cevap Telegram\'a geri gönderilir. Mesaja @ajan_id ile başlarsan başka bir ajanla konuşursun. Yalnızca yukarıdaki sohbet kimliğinin mesajları işlenir; uygulama kapalıyken yazılanlar okunmaz.': 'The answer is sent back to Telegram. Start a message with @agent_id to talk to another agent. Only messages from the chat id above are handled; messages written while the app is closed are not read.',
+  'Cevap Telegram\'a geri gönderilir. Mesaja @ajan_id ile başlarsan başka bir ajanla konuşursun. Yalnızca yukarıdaki sohbet kimliğinin mesajları işlenir; uygulama kapalıyken yazılanlar okunmaz. Ajanın konuşmayı unutması için /yeni yaz.': 'The answer is sent back to Telegram. Start a message with @agent_id to talk to another agent. Only messages from the chat id above are handled; messages written while the app is closed are not read. Write /yeni (or /new) to make the agent forget the conversation.',
   '(seçilmedi)': '(none)',
   'Henüz ayarlanmadı.': 'Not set up yet.',
   'Telegram ayarları kaydedilemedi.': 'The Telegram settings could not be saved.',

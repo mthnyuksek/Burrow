@@ -666,6 +666,16 @@ void WebFrame::HandleTelegramText(const std::string& raw) {
         SendTelegram("Önceki mesajın hâlâ işleniyor, bitince tekrar yaz.");
         return;
     }
+    const std::string command = str::Lower(text);
+    if (command == "/yeni" || command == "/new" || command == "/temizle" || command == "/clear") {
+        // Forget the conversation: the next message starts a fresh Claude session (cheaper, too).
+        // The transcript stays in Burrow, with a line that marks the break.
+        store_->SetSession(conversation, std::string());
+        store_->Append(conversation, {std::string(), std::string(), std::string(), "(Telegram: yeni konuşma başlatıldı, önceki mesajlar unutuldu.)"});
+        SendTelegram("Yeni konuşma başladı, önceki mesajları unuttum.");
+        PushChanged();
+        return;
+    }
     ConversationInfo info;
     std::vector<ConvMessage> messages;
     store_->Load(conversation, info, messages);

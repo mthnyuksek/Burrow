@@ -68,7 +68,7 @@ export default function create() {
     field(tr('Sohbet kimliği'), h('div', { style: { display: 'flex', gap: '8px' } }, tgChat, button(tr('Sohbet kimliğini bul'), { onClick: tgFind }))),
     h('label', { class: 'check-row' }, tgFail, ' ', tr('Zamanlı bir iş başarısız olursa bana haber ver')),
     h('label', { class: 'check-row' }, tgRecv, ' ', tr('Telegram\'dan gelen mesajları oku ve ajana ilet')),
-    field(tr('Mesajları alan ajan'), tgAgent, tr('Cevap Telegram\'a geri gönderilir. Mesaja @ajan_id ile başlarsan başka bir ajanla konuşursun. Yalnızca yukarıdaki sohbet kimliğinin mesajları işlenir; uygulama kapalıyken yazılanlar okunmaz.')),
+    field(tr('Mesajları alan ajan'), tgAgent, tr('Cevap Telegram\'a geri gönderilir. Mesaja @ajan_id ile başlarsan başka bir ajanla konuşursun. Yalnızca yukarıdaki sohbet kimliğinin mesajları işlenir; uygulama kapalıyken yazılanlar okunmaz. Ajanın konuşmayı unutması için /yeni yaz.')),
     tgStatus,
     h('div', { style: { display: 'flex', gap: '8px', marginTop: '10px' } },
       button(tr('Kaydet'), { kind: 'primary', onClick: tgSave }), button(tr('Test mesajı gönder'), { onClick: tgTest })));
