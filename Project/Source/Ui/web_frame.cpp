@@ -409,6 +409,7 @@ Json WebFrame::Snapshot() const {
             Json wj = Json::MakeObject();
             wj.Set("time", JStr(w.time));
             wj.Set("interval", JNum(w.interval_minutes));
+            wj.Set("days", JNum(w.days));
             wj.Set("task", JStr(w.task_id));
             wj.Set("project", JStr(w.project_id));
             wj.Set("text", JStr(w.Describe()));

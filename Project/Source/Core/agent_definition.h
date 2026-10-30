@@ -10,8 +10,10 @@ struct Wakeup {
     int interval_minutes = 0;  // > 0 = wake every N minutes
     std::string task_id;
     std::string project_id;  // optional: the run happens inside this project (its notes are read)
+    int days = 0;            // daily times only: bit 0 = Monday .. bit 6 = Sunday; 0 = every day
 
-    std::string Describe() const;  // "09:00" or "her 30 dk"
+    std::string Describe() const;  // "09:00", "Pzt,Çar 09:00" or "her 30 dk"
+    bool RunsOn(int weekday) const { return days == 0 || (days >> weekday & 1); }  // 0 = Monday
     std::string Serialize() const;
     static bool Parse(const std::string& text, Wakeup& out);
     static bool IsValidTime(const std::string& hhmm);

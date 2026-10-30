@@ -106,12 +106,17 @@ export function openAgentEditor(existing) {
       const task = selectInput([['', tr('(ajanın kendi talimatı)')], ...snap.tasks.map((t) => [t.id, t.name])], w.task);
       const proj = selectInput(projectOptions(tr('(proje yok)')), w.project);
       kind.style.width = '160px';
-      kind.addEventListener('change', () => { if (kind.value === 'interval') { w.interval = 30; w.time = ''; } else { w.interval = 0; w.time = '09:00'; } drawWakeups(); });
+      kind.addEventListener('change', () => { if (kind.value === 'interval') { w.interval = 30; w.time = ''; w.days = 0; } else { w.interval = 0; w.time = '09:00'; } drawWakeups(); });
       when.addEventListener('input', () => { if (w.interval > 0) w.interval = Number(when.value) || 1; else w.time = when.value; });
       task.addEventListener('change', () => { w.task = task.value; });
       proj.addEventListener('change', () => { w.project = proj.value; });
-      return h('div', { class: 'wake' }, kind, when, h('div', { class: 'grow' }, task), snap.projects.length ? h('div', { class: 'grow' }, proj) : null,
-        button('', { kind: 'ghost', iconName: 'trash', title: tr('Uyanışı sil'), onClick: () => { a.wakeups.splice(i, 1); drawWakeups(); } }));
+      const dayNames = [tr('Pzt'), tr('Sal'), tr('Çar'), tr('Per'), tr('Cum'), tr('Cmt'), tr('Paz')];
+      const days = w.interval > 0 ? null : h('div', { class: 'wake-days', style: { display: 'flex', gap: '4px', flexBasis: '100%' } }, dayNames.map((name, d) => {
+        const on = ((w.days || 0) >> d & 1) === 1;
+        return button(name, { small: true, kind: on ? 'primary' : 'ghost', title: tr('Seçili gün yoksa her gün çalışır.'), onClick: () => { w.days = (w.days || 0) ^ (1 << d); drawWakeups(); } });
+      }));
+      return h('div', { class: 'wake', style: { flexWrap: 'wrap' } }, kind, when, h('div', { class: 'grow' }, task), snap.projects.length ? h('div', { class: 'grow' }, proj) : null,
+        button('', { kind: 'ghost', iconName: 'trash', title: tr('Uyanışı sil'), onClick: () => { a.wakeups.splice(i, 1); drawWakeups(); } }), days);
     }));
     if (!a.wakeups.length) wakeBox.append(h('div', { class: 'muted' }, tr('Uyanış yok: ajan yalnızca sen çağırınca çalışır.')));
   };
@@ -131,7 +136,7 @@ export function openAgentEditor(existing) {
         h('div', { class: 'field' }, h('label', null, tr('Durum')), h('label', { class: 'check', style: { marginTop: '6px' } }, enabled, tr('Etkin (kapalıysa uykuda)')))),
       field(tr('Yetenekler'), h('div', { class: 'checks' }, skillChecks.length ? skillChecks.map((s) => s.el) : h('span', { class: 'muted' }, tr('Henüz yetenek yok.'))),
         tr('Ajan yalnızca verdiğin yeteneklerin araçlarını kullanabilir.')),
-      field(tr('Uyanışlar'), h('div', null, wakeBox, button(tr('Uyanış ekle'), { small: true, iconName: 'plus', onClick: () => { a.wakeups.push({ time: '09:00', interval: 0, task: '', project: '' }); drawWakeups(); } }))),
+      field(tr('Uyanışlar'), h('div', null, wakeBox, button(tr('Uyanış ekle'), { small: true, iconName: 'plus', onClick: () => { a.wakeups.push({ time: '09:00', interval: 0, days: 0, task: '', project: '' }); drawWakeups(); } }))),
       field(tr('Kişilik / kalıcı talimat'), persona),
       error,
     ],

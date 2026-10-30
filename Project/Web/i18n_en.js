@@ -172,6 +172,8 @@ export default {
   'boş = Claude Code varsayılanı (haiku, sonnet, opus)': 'empty = Claude Code default (haiku, sonnet, opus)',
   'Bu ajan kim, nasıl çalışır? Kısa tut: her çalıştırmada token olarak ödenir.': 'Who is this agent and how does it work? Keep it short: it is paid for in tokens on every run.',
   'Her gün': 'Every day',
+  'Pzt': 'Mon', 'Sal': 'Tue', 'Çar': 'Wed', 'Per': 'Thu', 'Cum': 'Fri', 'Cmt': 'Sat', 'Paz': 'Sun',
+  'Seçili gün yoksa her gün çalışır.': 'With no day selected it runs every day.',
   'Her N dakikada': 'Every N minutes',
   '(ajanın kendi talimatı)': '(the agent’s own instructions)',
   '(proje yok)': '(no project)',

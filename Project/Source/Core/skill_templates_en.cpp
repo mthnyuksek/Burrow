@@ -46,7 +46,7 @@ reports_to: id of the agent it reports to (empty if none)
 model: haiku, sonnet or opus (empty = default)
 enabled: true
 skill: skill_id (one line per skill; id = file name in the Skills/ folder)
-wake: 09:00 | task_id (optional; "every 30 | task_id" = every 30 minutes; task_id may be empty)
+wake: 09:00 | task_id (optional; "every 30 | task_id" = every 30 minutes; "mon,wed 09:00 | task_id" = only on those days (mon tue wed thu fri sat sun); task_id may be empty)
 ---
 Task file Tasks/<id>.md: name, model, priority (0 low, 1 normal, 2 high), min_remaining_percent, the instructions below.
 When editing, read the file and change only the relevant line with Edit. To disable an agent write enabled: false.

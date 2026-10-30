@@ -360,6 +360,23 @@ void TestTelegramConfig() {
     fsx::RemoveDirRecursive(dir);
 }
 
+void TestWeekdayWakeups() {
+    Wakeup w;
+    CHECK(Wakeup::Parse("Mon,wed 09:00 | t | p", w) && w.days == 5 && w.time == "09:00" && w.task_id == "t" &&
+          w.project_id == "p" && w.Serialize() == "mon,wed 09:00 | t | p" && w.Describe() == "Pzt,Çar 09:00");
+    CHECK(!Wakeup::Parse("funday 09:00 | t", w) && !Wakeup::Parse("mon 25:00 | t", w));
+    CHECK(Wakeup::Parse("mon,tue,wed,thu,fri,sat,sun 07:30 | t", w) && w.days == 0);
+
+    AgentDefinition a;
+    a.id = "a";
+    Wakeup::Parse("sat 09:00 | t", w);  // 2026-11-07 is a Saturday, 11-05 a Thursday
+    a.wakeups = {w};
+    Scheduler s;
+    s.Reset(timeutil::Make(2026, 11, 5, 8, 0, 0));
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 5, 9, 3, 0)).empty());
+    CHECK(s.Collect({a}, timeutil::Make(2026, 11, 7, 9, 3, 0)).size() == 1);
+}
+
 void TestScheduler() {
     AgentDefinition a;
     a.id = "a";
@@ -650,6 +667,7 @@ int main(int argc, char** argv) {
     TestUsageStats();
     TestReplyParsing();
     TestScheduler();
+    TestWeekdayWakeups();
     TestConversationsAndJobs();
     TestProcess();
     std::printf("offline: %d passed, %d failed\n", g_passes, g_failures);

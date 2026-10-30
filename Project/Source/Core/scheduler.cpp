@@ -24,6 +24,8 @@ std::vector<Scheduler::Due> Scheduler::Collect(const std::vector<AgentDefinition
                 }
                 continue;
             }
+            if (!w.RunsOn(timeutil::Weekday(now)))
+                continue;
             long h = 0, m = 0;
             if (!str::ToLong(str::BeforeFirst(w.time, ':'), h) || !str::ToLong(str::AfterFirst(w.time, ':'), m))
                 continue;

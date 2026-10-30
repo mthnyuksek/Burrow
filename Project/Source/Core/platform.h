@@ -41,5 +41,6 @@ std::string IsoDate(time_t t);                              // "2026-10-29"
 time_t Make(int year, int month, int day, int hour = 0, int minute = 0, int second = 0);  // local time
 time_t SetClock(time_t day, int hour, int minute);          // same local date, other time of day
 bool SameDate(time_t a, time_t b);
+int Weekday(time_t t);  // local weekday, 0 = Monday .. 6 = Sunday
 std::string DateDaysBefore(const std::string& iso_date, int days);  // unparsable input is returned as it is
 }  // namespace timeutil

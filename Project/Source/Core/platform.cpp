@@ -208,6 +208,12 @@ time_t timeutil::SetClock(time_t day, int hour, int minute) {
 
 bool timeutil::SameDate(time_t a, time_t b) { return IsoDate(a) == IsoDate(b); }
 
+int timeutil::Weekday(time_t t) {
+    std::tm local = {};
+    localtime_s(&local, &t);
+    return (local.tm_wday + 6) % 7;  // tm_wday: 0 = Sunday
+}
+
 std::string timeutil::DateDaysBefore(const std::string& iso_date, int days) {
     int y = 0, m = 0, d = 0;
     if (std::sscanf(iso_date.c_str(), "%d-%d-%d", &y, &m, &d) != 3)

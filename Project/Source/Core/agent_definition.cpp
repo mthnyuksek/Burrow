@@ -6,12 +6,29 @@
 #include <algorithm>
 #include <set>
 
+namespace {
+const char* const kDayKeys[7] = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+const char* const kDayNamesTr[7] = {"Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"};
+
+std::string DayList(int days, const char* const* names) {
+    std::string out;
+    for (int i = 0; i < 7; ++i)
+        if (days >> i & 1)
+            out += (out.empty() ? "" : ",") + std::string(names[i]);
+    return out;
+}
+}  // namespace
+
 std::string Wakeup::Describe() const {
-    return interval_minutes > 0 ? str::Format("her %d dk", interval_minutes) : time;
+    if (interval_minutes > 0)
+        return str::Format("her %d dk", interval_minutes);
+    return days == 0 ? time : DayList(days, kDayNamesTr) + " " + time;
 }
 
 std::string Wakeup::Serialize() const {
-    const std::string when = interval_minutes > 0 ? str::Format("every %d", interval_minutes) : time;
+    std::string when = interval_minutes > 0 ? str::Format("every %d", interval_minutes) : time;
+    if (interval_minutes <= 0 && days != 0)
+        when = DayList(days, kDayKeys) + " " + time;
     return when + " | " + task_id + (project_id.empty() ? std::string() : " | " + project_id);
 }
 
@@ -31,10 +48,27 @@ bool Wakeup::Parse(const std::string& line, Wakeup& out) {
         if (!str::ToLong(str::Trim(when.substr(6)), n) || n <= 0)
             return false;
         w.interval_minutes = static_cast<int>(n);
-    } else if (IsValidTime(when)) {
-        w.time = when;
     } else {
-        return false;
+        // "09:00" or "mon,wed 09:00"
+        const size_t space = when.find(' ');
+        std::string clock = when;
+        if (space != std::string::npos) {
+            clock = str::Trim(when.substr(space + 1));
+            for (const std::string& d : str::Split(when.substr(0, space), ',')) {
+                int bit = -1;
+                for (int i = 0; i < 7; ++i)
+                    if (str::CmpNoCase(str::Trim(d), kDayKeys[i]) == 0)
+                        bit = i;
+                if (bit < 0)
+                    return false;
+                w.days |= 1 << bit;
+            }
+        }
+        if (!IsValidTime(clock))
+            return false;
+        w.time = clock;
+        if (w.days == 127)
+            w.days = 0;  // all seven = every day
     }
     out = w;
     return true;
