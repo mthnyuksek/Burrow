@@ -7,9 +7,10 @@ import { openForm } from '../forms.js';
 import { startChat } from '../agent_actions.js';
 import { tr } from '../i18n.js';
 
-function avatar(id, size = 40) {
+// The mascot only works when told to: the agent-wide state would animate it in every chat the agent is in.
+function avatar(id, size = 40, working = false) {
   const a = agentById(id);
-  if (a) return mascotEl(a.mascot, a.state, size);
+  if (a) return mascotEl(a.mascot, working ? 'working' : a.state === 'sleeping' ? 'sleeping' : 'idle', size);
   return h('div', { class: 'avatar', style: { width: `${size}px`, height: `${size}px`, fontWeight: 700, color: 'var(--accent)' } }, id === 'user' ? 'S' : '?');
 }
 
@@ -97,8 +98,8 @@ export default function create() {
     if (!shown.length) listBox.append(h('div', { class: 'empty' }, list.length ? tr('Filtreye uyan konuşma yok.') : tr('Henüz konuşma yok.')));
     for (const c of shown) {
       const pic = c.kind === 'chat'
-        ? avatar(c.participants[0]?.id, 40)
-        : h('div', { class: 'pair' }, avatar(c.participants[0]?.id, 28), avatar(c.participants[1]?.id || c.participants[0]?.id, 28));
+        ? avatar(c.participants[0]?.id, 40, c.active)
+        : h('div', { class: 'pair' }, ...c.participants.slice(0, 2).map((p) => avatar(p.id, 28, (c.writers || []).includes(p.id))));
       listBox.append(h('div', { class: `chat-item ${c.id === selected ? 'sel' : ''}`, onClick: () => open(c.id) },
         pic,
         h('div', { class: 'meta' },
@@ -139,9 +140,10 @@ export default function create() {
       return;
     }
     const between = conv.kind !== 'chat';
+    const writing = new Set((conv.writers || []).map((w) => w.id));
     const who = between ? conv.participants.map((p) => p.name).join(' ↔ ') : conv.participants[0]?.name || '?';
     clear(head).append(
-      between ? h('div', { class: 'pair' }, avatar(conv.participants[0]?.id, 28), avatar(conv.participants[1]?.id || conv.participants[0]?.id, 28)) : avatar(conv.participants[0]?.id, 44),
+      between ? h('div', { class: 'pair' }, ...conv.participants.slice(0, 2).map((p) => avatar(p.id, 28, writing.has(p.id)))) : avatar(conv.participants[0]?.id, 44, conv.busy),
       h('div', { class: 'grow' }, h('div', { class: 'tt' }, conv.title),
         h('div', { class: 'ss' }, conv.project_name ? tr('{who} · Proje: {project} · {n} mesaj', { who, project: conv.project_name, n: conv.messages.length }) : tr('{who} · {n} mesaj', { who, n: conv.messages.length }))),
       button('', { kind: 'ghost', iconName: 'edit', title: tr('Yeniden adlandır'), onClick: rename }),
@@ -154,7 +156,7 @@ export default function create() {
     if (conv.busy) {
       // Show whoever is writing into this conversation; a chat whose agent waits for a colleague still shows the chat's agent.
       const writers = conv.writers?.length ? conv.writers : conv.participants.slice(0, 1);
-      transcript.append(h('div', { class: 'typing' }, avatar(writers[0]?.id, 34),
+      transcript.append(h('div', { class: 'typing' }, avatar(writers[0]?.id, 34, true),
         h('span', null, tr('{name} yazıyor', { name: writers.map((w) => w.name).join(', ') })), h('span', { class: 'dots' }, h('span'), h('span'), h('span'))));
     }
     if (forceScroll || switched || nearBottom) transcript.scrollTop = transcript.scrollHeight;

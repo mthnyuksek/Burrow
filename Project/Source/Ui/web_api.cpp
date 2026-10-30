@@ -240,6 +240,10 @@ Json WebFrame::ChatList() const {
         }
         j.Set("participants", people);
         j.Set("active", JBool(active));
+        Json writer_ids = Json::MakeArray();
+        for (const std::string& w : runs_.ConversationWriters(c.id))
+            writer_ids.Push(JStr(w));
+        j.Set("writers", writer_ids);
         list.Push(j);
     }
     return list;
