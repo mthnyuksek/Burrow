@@ -254,8 +254,15 @@ std::string WebFrame::ProjectName(const std::string& project_id) const {
 
 void WebFrame::ReloadRuns() { run_records_ = RunRecord::LoadAll(vault_.SubDir("Runs")); }
 
+void WebFrame::ApplySettings() {
+    runs_.max_concurrent = vault_.MaxConcurrent();
+    runs_.default_model = vault_.DefaultModel();
+    MaxAgentHops() = vault_.MaxHops();
+}
+
 void WebFrame::ReloadAll() {
     vault_.ReloadSettings();
+    ApplySettings();
     UpdateTitle();
     auto by_name = [](const auto& a, const auto& b) { return str::CmpNoCase(a.name, b.name) < 0; };
     tasks_ = vault_.LoadTasks();
@@ -279,7 +286,43 @@ Json WebFrame::Snapshot() const {
     vault.Set("name", JStr(vault_.Name()));
     vault.Set("root", JStr(vault_.Root()));
     vault.Set("language", JStr(vault_.Language()));
+    vault.Set("max_concurrent", JNum(vault_.MaxConcurrent()));
+    vault.Set("max_hops", JNum(vault_.MaxHops()));
+    vault.Set("default_model", JStr(vault_.DefaultModel()));
+    vault.Set("daily_budget", JNum(static_cast<double>(vault_.DailyTokenBudget())));
+    vault.Set("weekly_budget", JNum(static_cast<double>(vault_.WeeklyTokenBudget())));
     out.Set("vault", vault);
+
+    // Tokens of all agents together, counted against the vault-wide budget.
+    long tokens_today = 0, tokens_7d = 0;
+    for (const auto& entry : usage) {
+        tokens_today += entry.second.tokens_today;
+        tokens_7d += entry.second.tokens_7d;
+    }
+    Json budget = Json::MakeObject();
+    budget.Set("tokens_today", JNum(static_cast<double>(tokens_today)));
+    budget.Set("tokens_7d", JNum(static_cast<double>(tokens_7d)));
+    budget.Set("daily_over", JBool(OverDailyLimit(tokens_today, static_cast<int>(vault_.DailyTokenBudget()))));
+    budget.Set("weekly_over", JBool(OverDailyLimit(tokens_7d, static_cast<int>(vault_.WeeklyTokenBudget()))));
+    out.Set("budget", budget);
+
+    Json jobs = Json::MakeArray();
+    for (const JobInfo& i : runs_.Jobs()) {
+        Json jj = Json::MakeObject();
+        jj.Set("id", JNum(static_cast<double>(i.id)));
+        jj.Set("running", JBool(i.running));
+        jj.Set("agent_id", JStr(i.agent_id));
+        jj.Set("agent", JStr(i.agent_name));
+        jj.Set("task", JStr(i.task_name));
+        jj.Set("conversation", JStr(i.conversation_id));
+        jj.Set("started", JNum(static_cast<double>(i.started)));
+        Json lines = Json::MakeArray();
+        for (const std::string& l : i.activity)
+            lines.Push(JStr(l));
+        jj.Set("activity", lines);
+        jobs.Push(jj);
+    }
+    out.Set("jobs", jobs);
     out.Set("needs_vault", JBool(!HasVault()));
     out.Set("start_page", JStr(start_page_));
     out.Set("scheduler", JBool(scheduler_on_));
@@ -484,10 +527,18 @@ void WebFrame::OnSchedulerTick() {
     const TeamContext team = Team();
     const time_t now = timeutil::Now();
     const std::map<std::string, AgentUsage> usage = ComputeUsage(run_records_, timeutil::IsoDate(now));
+    long tokens_today = 0, tokens_7d = 0;
+    for (const auto& entry : usage) {
+        tokens_today += entry.second.tokens_today;
+        tokens_7d += entry.second.tokens_7d;
+    }
+    // The vault-wide budget only holds back wake-ups; chats and manual runs are never blocked.
+    const bool over_budget = OverDailyLimit(tokens_today, static_cast<int>(vault_.DailyTokenBudget())) ||
+                             OverDailyLimit(tokens_7d, static_cast<int>(vault_.WeeklyTokenBudget()));
     for (const Scheduler::Due& due : scheduler_.Collect(agents_, now)) {
         const AgentDefinition* agent = team.FindAgent(due.agent_id);
-        if (!agent || runs_.IsAgentBusy(agent->id))
-            continue;  // one thing at a time per agent
+        if (!agent || over_budget || runs_.IsAgentBusy(agent->id))
+            continue;  // over the vault budget, or one thing at a time per agent
         const auto spent = usage.find(agent->id);
         if (spent != usage.end() && OverDailyLimit(spent->second.tokens_today, agent->daily_token_limit))
             continue;  // daily token limit reached, wakes up again tomorrow

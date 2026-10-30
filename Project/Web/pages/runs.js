@@ -1,5 +1,6 @@
 import { call } from '../api.js';
-import { h, clear, button, fmtTokens, fmtDuration, relTime, showError } from '../ui.js';
+import { h, clear, button, fmtTokens, fmtDuration, relTime, showError, toast } from '../ui.js';
+import { state } from '../state.js';
 import { renderMarkdown } from '../markdown.js';
 import { tr } from '../i18n.js';
 
@@ -9,14 +10,16 @@ export default function create() {
   const filterAgent = h('select');
   const filterStatus = h('select', null,
     h('option', { value: '' }, tr('Tüm durumlar')), ...['tamamlandı', 'hata', 'atlandı', 'durduruldu'].map((s) => h('option', { value: s }, tr(s))));
+  const jobsBox = h('div', { class: 'card' });
   const body = h('div', { class: 'card' });
+  let jobsSig = null;
   const el = h('div', null,
     h('div', { class: 'page-head' },
       button(tr('Yenile'), { iconName: 'refresh', onClick: load }),
       h('div', { style: { width: '200px' } }, filterAgent), h('div', { style: { width: '180px' } }, filterStatus),
       h('div', { class: 'grow' }),
       h('div', { class: 'hint' }, tr('Kasadaki Runs klasöründen okunur; hiç token harcamaz.'))),
-    body);
+    jobsBox, body);
 
   const chip = (s) => h('span', { class: `chip ${s === 'tamamlandı' ? 'good' : s === 'hata' ? 'bad' : 'warn'}` }, tr(s));
 
@@ -31,6 +34,25 @@ export default function create() {
     } catch (e) { showError(e); }
   }
 
+  // Queued and running jobs with what they do right now; each can be stopped on its own.
+  function drawJobs() {
+    const jobs = state.snap?.jobs || [];
+    jobsBox.style.display = jobs.length ? '' : 'none';
+    clear(jobsBox);
+    if (!jobs.length) return;
+    jobsBox.append(h('div', { class: 'card-head' }, h('h3', null, tr('Şu an çalışanlar'))),
+      jobs.map((j) => h('div', { class: 'job-row' },
+        h('div', { class: 'grow' },
+          h('div', null, h('b', null, j.agent || '—'), ' ', h('span', { class: 'muted' }, j.task || tr('sohbet')), ' ',
+            h('span', { class: `chip ${j.running ? 'working' : 'warn'} plain` }, j.running ? tr('çalışıyor') : tr('sırada'))),
+          j.activity.length ? h('div', { class: 'live' }, j.activity.slice(-5).map((l) => h('div', null, l))) : null),
+        button(tr('Durdur'), { kind: 'ghost', small: true, iconName: 'stop', onClick: () => call('job.cancel', { id: j.id }).catch(showError) }))));
+  }
+
+  async function retry(run) {
+    try { await call('run.retry', { id: run.id }); toast(tr('Yeniden sıraya alındı.')); load(); } catch (e) { showError(e); }
+  }
+
   function draw() {
     const names = [...new Set(runs.map((r) => r.agent).filter(Boolean))];
     const keepAgent = filterAgent.value;
@@ -40,7 +62,7 @@ export default function create() {
     clear(body);
     if (!rows.length) { body.append(h('div', { class: 'empty' }, tr('Kayıt yok.'))); return; }
     body.append(h('table', { class: 'tbl' },
-      h('thead', null, h('tr', null, [tr('Zaman'), tr('Ajan'), tr('İş'), tr('Kaynak'), tr('Durum'), tr('Token'), tr('Süre')].map((t, i) => h('th', { class: i > 4 ? 'num' : '' }, t)))),
+      h('thead', null, h('tr', null, [tr('Zaman'), tr('Ajan'), tr('İş'), tr('Kaynak'), tr('Durum'), tr('Token'), tr('Süre'), ''].map((t, i) => h('th', { class: i > 4 && i < 7 ? 'num' : '' }, t)))),
       h('tbody', null, rows.flatMap((r) => [
         h('tr', { class: 'click', onClick: () => toggle(r) },
           h('td', { class: 'muted' }, relTime(r.time), h('div', { class: 'faint', style: { fontSize: '11px' } }, r.time)),
@@ -49,8 +71,9 @@ export default function create() {
           h('td', { class: 'muted' }, tr(r.source)),
           h('td', null, chip(r.status)),
           h('td', { class: 'num' }, fmtTokens(r.tokens)),
-          h('td', { class: 'num' }, fmtDuration(r.duration))),
-        open === r.id ? h('tr', null, h('td', { colspan: 7 }, h('div', { id: `run-${r.id}`, class: 'run-text' }))) : null,
+          h('td', { class: 'num' }, fmtDuration(r.duration)),
+          h('td', { class: 'num' }, r.retry ? button('', { kind: 'ghost', small: true, iconName: 'refresh', title: tr('Yeniden dene'), onClick: (e) => { e.stopPropagation(); retry(r); } }) : null)),
+        open === r.id ? h('tr', null, h('td', { colspan: 8 }, h('div', { id: `run-${r.id}`, class: 'run-text' }))) : null,
       ]))));
   }
 
@@ -60,5 +83,12 @@ export default function create() {
   filterAgent.addEventListener('change', draw);
   filterStatus.addEventListener('change', draw);
 
-  return { el, refresh: load };
+  return {
+    el,
+    refresh() {
+      drawJobs();
+      const sig = (state.snap?.jobs || []).map((j) => `${j.id}${j.running}`).join(',');
+      if (sig !== jobsSig) { jobsSig = sig; load(); }  // a job started or ended: the record list changed
+    },
+  };
 }

@@ -189,6 +189,20 @@ void TestVaultLanguage() {
     CHECK(again.SetLanguage("en", error));
     again.ReloadSettings();
     CHECK(again.Language() == "en" && again.Name() == "Eski");
+
+    // Run limits and the token budget: defaults, then values (clamped) written next to the rest.
+    CHECK(again.MaxConcurrent() == 1 && again.MaxHops() == 8 && again.DefaultModel().empty());
+    CHECK(again.DailyTokenBudget() == 0 && again.WeeklyTokenBudget() == 0);
+    CHECK(again.SetSetting("MaxConcurrent", "3", error) && again.SetSetting("MaxHops", "99", error));
+    CHECK(again.SetSetting("DefaultModel", "haiku", error) && again.SetSetting("DailyTokens", "50000", error));
+    CHECK(again.SetSetting("WeeklyTokens", "300000", error));
+    Vault third;
+    CHECK(Vault::Open(dir, third, error));
+    CHECK(third.MaxConcurrent() == 3 && third.MaxHops() == 20 && third.DefaultModel() == "haiku");
+    CHECK(third.DailyTokenBudget() == 50000 && third.WeeklyTokenBudget() == 300000);
+    CHECK(third.Language() == "en" && third.Name() == "Eski");
+    CHECK(third.SetSetting("MaxConcurrent", "2", error));
+    CHECK(third.MaxConcurrent() == 2);
     fsx::RemoveDirRecursive(dir);
 }
 

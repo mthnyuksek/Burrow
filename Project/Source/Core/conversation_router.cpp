@@ -28,7 +28,7 @@ void ConversationRouter::RouteSend(const TeamContext& team, const AgentDefinitio
         note = "(Gönderilemedi: \"" + send.to + "\" adında bir ajan yok.)";
     else if (!target->enabled)
         note = "(Gönderilemedi: " + target->name + " uykuda.)";
-    else if (job.hops + 1 > kMaxAgentHops)
+    else if (job.hops + 1 > MaxAgentHops())
         note = "(Zincir sınırına ulaşıldı, mesaj iletilmedi.)";
 
     const ReplyFrame* receiver = job.reply_stack.empty() ? nullptr : &job.reply_stack.back();
@@ -118,7 +118,7 @@ void ConversationRouter::HandleResult(const TeamContext& team, const RunResult& 
     if (!asker || report.empty())
         return;
 
-    if (job.hops + 1 > kMaxAgentHops) {
+    if (job.hops + 1 > MaxAgentHops()) {
         if (!receiver->conversation_id.empty())
             store_->Append(receiver->conversation_id,
                            {std::string(), std::string(), std::string(), "(Zincir sınırına ulaşıldı, sonuç iletilmedi.)"});

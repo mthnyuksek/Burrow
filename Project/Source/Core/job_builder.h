@@ -27,6 +27,12 @@ struct TeamContext {
 // back and forth (every step costs tokens). A user -> A -> B -> A report chain needs 3.
 constexpr int kMaxAgentHops = 8;
 
+// The limit in force: kMaxAgentHops unless the vault settings (MaxHops=) say otherwise.
+inline int& MaxAgentHops() {
+    static int limit = kMaxAgentHops;
+    return limit;
+}
+
 // Every job can belong to a project (project_id, empty = none). The project's summary and its
 // enabled notes are then added to the system prompt, so the agent knows the context without
 // being reminded. An unknown project id is ignored.

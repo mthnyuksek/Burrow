@@ -29,6 +29,14 @@ public:
     const std::string& Language() const { return language_; }
     bool SetLanguage(const std::string& code, std::string& error);
     static std::string NormalizeLanguage(const std::string& code);  // anything but "en" becomes "tr"
+    // Settings kept in vault.ini next to the language (0 = unlimited / default where noted).
+    int MaxConcurrent() const { return max_concurrent_; }      // jobs run at the same time, 1..4
+    int MaxHops() const { return max_hops_; }                  // agent-to-agent steps per chain, 1..20
+    const std::string& DefaultModel() const { return default_model_; }  // used when agent and task name none
+    long DailyTokenBudget() const { return daily_tokens_; }    // all agents together, 0 = none
+    long WeeklyTokenBudget() const { return weekly_tokens_; }  // last 7 days, 0 = none
+    // Writes one "Key=value" line of vault.ini (replaces it or appends it) and reloads the settings.
+    bool SetSetting(const std::string& key, const std::string& value, std::string& error);
     // Re-reads vault.ini (an agent may have edited the name or the language).
     void ReloadSettings();
 
@@ -63,4 +71,9 @@ private:
     std::string name_;
     std::string root_;
     std::string language_ = "tr";
+    int max_concurrent_ = 1;
+    int max_hops_ = 8;
+    std::string default_model_;
+    long daily_tokens_ = 0;
+    long weekly_tokens_ = 0;
 };

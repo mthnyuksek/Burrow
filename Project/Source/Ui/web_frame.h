@@ -61,6 +61,7 @@ private:
     bool HasVault() const { return !vault_.Root().empty(); }
     void StartVaultMachinery();  // run manager, conversation store and router for vault_
     void ReloadAll();
+    void ApplySettings();  // vault.ini settings -> run manager and router limits
     void ReloadRuns();
     TeamContext Team() const;
     std::string NameOf(const std::string& agent_id) const;

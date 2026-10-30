@@ -83,6 +83,18 @@ Json WebFrame::Dispatch(const std::string& cmd, const Json& args) {
         runs_.RefreshUsage();
         return Json();
     }
+    if (cmd == "job.cancel") {
+        runs_.CancelJob(static_cast<long>(args["id"].AsNumber()));
+        return Json();
+    }
+    if (cmd == "chat.stop") {
+        runs_.CancelConversation(WStr(args["id"]));
+        return Json();
+    }
+    if (cmd == "run.retry") {
+        Require(runs_.Retry(WStr(args["id"])), "Bu iş artık yeniden denenemez (uygulama kapanıp açılmış olabilir).");
+        return Json();
+    }
     if (cmd == "runs.stopAll") {
         runs_.CancelAll();
         return Json();
@@ -117,8 +129,21 @@ Json WebFrame::Dispatch(const std::string& cmd, const Json& args) {
 
     if (cmd == "settings.set") {
         std::string error;
-        if (!vault_.SetLanguage(WStr(args["language"]), error))
+        auto put = [&](const char* arg, const char* key, std::string value) {
+            if (!args[arg].IsNull() && !vault_.SetSetting(key, value, error))
+                throw ApiError(error);
+        };
+        if (!args["language"].IsNull() && !vault_.SetLanguage(WStr(args["language"]), error))
             throw ApiError(error);
+        auto count = [&](const char* arg, int lo, int hi) {
+            return std::to_string(std::clamp(static_cast<int>(args[arg].AsNumber()), lo, hi));
+        };
+        put("max_concurrent", "MaxConcurrent", count("max_concurrent", 1, 4));
+        put("max_hops", "MaxHops", count("max_hops", 1, 20));
+        put("default_model", "DefaultModel", Trimmed(args["default_model"]));
+        put("daily_budget", "DailyTokens", count("daily_budget", 0, 2000000000));
+        put("weekly_budget", "WeeklyTokens", count("weekly_budget", 0, 2000000000));
+        ApplySettings();
         PushChanged();
         return Json();
     }
@@ -351,6 +376,7 @@ Json WebFrame::RunList() const {
         j.Set("tokens", JNum(static_cast<double>(r.tokens)));
         j.Set("cost", JNum(r.cost_usd));
         j.Set("duration", JNum(r.duration_s));
+        j.Set("retry", JBool(runs_.CanRetry(r.id)));
         list.Push(j);
         if (++shown >= 300)
             break;

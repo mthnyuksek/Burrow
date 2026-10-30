@@ -284,8 +284,15 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .md h1, .md h2, .md h3, .md h4 { margin: 12px 0 6px; font-size: 15px; }
 .md blockquote { margin: 8px 0; padding: 2px 12px; border-left: 3px solid var(--accent); color: var(--muted); }
 .md a { color: #aab4ff; }
-.typing { align-self: flex-start; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.typing { align-self: stretch; display: flex; align-items: flex-start; gap: 10px; color: var(--muted); font-size: 13px; }
 .typing .dots span { display: inline-block; width: 6px; height: 6px; margin-right: 3px; border-radius: 50%; background: var(--accent); animation: blink 1.2s infinite; }
+.typing-line { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+.live { margin-top: 2px; padding: 6px 10px; border-left: 2px solid var(--accent); color: var(--muted); font: 12px/1.5 var(--mono); max-width: 640px; }
+.live div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live div:last-child { color: var(--text); }
+.job-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.job-row:last-child { border-bottom: 0; }
+.job-row .grow { min-width: 0; }
 .typing .dots span:nth-child(2) { animation-delay: 0.2s; } .typing .dots span:nth-child(3) { animation-delay: 0.4s; }
 .composer { padding: 14px 24px 18px; border-top: 1px solid var(--border-soft); display: flex; gap: 10px; align-items: flex-end; }
 .composer textarea { min-height: 44px; max-height: 180px; resize: none; }

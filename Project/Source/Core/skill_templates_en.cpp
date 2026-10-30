@@ -15,14 +15,19 @@ struct English {
 
 const English kEnglish[] = {
     {"kasa_ayarlari", "Edit vault settings",
-     "Edits the settings of the current vault (vault name, interface language).",
+     "Edits the settings of the current vault (vault name, language, run limits, token budget).",
      R"(The vault settings are in vault.ini in the vault folder. Your working folder is the vault folder.
 Format:
 [Vault]
 Name=Vault name
 Version=2
 Language=tr
-Name: the vault name. Language: interface language, tr (Türkçe) or en (English); write no other value.
+MaxConcurrent=1
+MaxHops=8
+DefaultModel=
+DailyTokens=0
+WeeklyTokens=0
+Name: the vault name. Language: interface language, tr (Türkçe) or en (English); write no other value. MaxConcurrent: jobs running at once (1-4). MaxHops: agent-to-agent steps in a chain (1-20). DefaultModel: model used when none is named, may be empty. DailyTokens / WeeklyTokens: token budget of the whole vault, 0 = unlimited. The last five lines are optional; if missing, add them at the end of the file.
 Change only the line the user asks about and leave Version alone. If there is no Language line, add it at the end of the file. Read the file first, then change it with Edit.
 The change shows in the app when this run ends; tell the user so.)"},
 

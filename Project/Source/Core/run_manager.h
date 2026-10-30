@@ -25,6 +25,7 @@ struct ReplyFrame {
 
 // Everything needed to run Claude Code once.
 struct RunJob {
+    long id = 0;  // set by Enqueue; names the job for CancelJob
     JobSource source = JobSource::Manual;
     std::string agent_id;
     std::string agent_name;
@@ -72,6 +73,15 @@ struct RunResult {
     time_t started = 0;  // 0 = not started
 };
 
+// What the page may show about a queued or running job.
+struct JobInfo {
+    long id = 0;
+    bool running = false;
+    std::string agent_id, agent_name, task_name, conversation_id;
+    time_t started = 0;
+    std::vector<std::string> activity;  // newest last: tools used and text written so far
+};
+
 // Queues jobs, runs at most max_concurrent of them at a time (highest priority
 // first), applies the usage gate and reports results. Lives on the GUI thread.
 class RunManager {
@@ -89,6 +99,15 @@ public:
     void Enqueue(RunJob job);
     void RefreshUsage();  // asks Claude Code for fresh usage numbers with a tiny request
     void CancelAll();
+    // Stops one job (removes it from the queue or kills the process). False if it is gone already.
+    bool CancelJob(long job_id);
+    // Stops every queued or running job that still has to write into this conversation.
+    void CancelConversation(const std::string& conversation_id);
+    // A job that ended Failed, Skipped or Stopped can be queued again once, as it was.
+    bool CanRetry(const std::string& run_id) const;
+    bool Retry(const std::string& run_id);
+    // Queued and running jobs (not the usage probe) with what they are doing.
+    std::vector<JobInfo> Jobs() const;
 
     const UsageInfo& Usage() const { return usage_; }
     size_t QueuedCount() const { return queue_.size(); }
@@ -100,6 +119,7 @@ public:
     std::vector<std::string> ConversationWriters(const std::string& conversation_id) const;
     std::vector<std::string> BusyAgents() const;
 
+    std::string default_model;  // used when a job names no model
     int max_concurrent = 1;  // a subscription has a shared limit, so keep this low
 
     std::function<void(const RunResult&)> on_finished;
@@ -124,4 +144,6 @@ private:
     std::vector<RunJob> queue_;
     std::vector<std::unique_ptr<Active>> active_;
     long counter_ = 0;
+    long next_job_id_ = 0;
+    std::vector<std::pair<std::string, RunJob>> retryable_;  // newest last, run id -> job
 };

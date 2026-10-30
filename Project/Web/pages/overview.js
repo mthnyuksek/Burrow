@@ -11,7 +11,8 @@ export default function create({ navigate }) {
   const team = h('div', { class: 'card' });
   const recent = h('div', { class: 'card' });
   const flow = h('div', { class: 'card' });
-  const el = h('div', null, stats, h('div', { class: 'two-col' }, team, h('div', { style: { display: 'grid', gap: '18px', alignContent: 'start' } }, flow, recent)));
+  const alert = h('div', { class: 'card', style: { borderColor: 'var(--warn)', display: 'none' } });
+  const el = h('div', null, alert, stats, h('div', { class: 'two-col' }, team, h('div', { style: { display: 'grid', gap: '18px', alignContent: 'start' } }, flow, recent)));
 
   const stat = (k, v, s) => h('div', { class: 'stat' }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v), h('div', { class: 's' }, s));
 
@@ -44,9 +45,18 @@ export default function create({ navigate }) {
     const working = snap.agents.filter((a) => a.state === 'working').length;
     const tokensToday = snap.agents.reduce((n, a) => n + a.tokens_today, 0);
     const tokens7 = snap.agents.reduce((n, a) => n + a.tokens_7d, 0);
+    // Vault-wide budget (Ayarlar): only scheduled wake-ups are held back once it is used up.
+    const b = snap.budget, v = snap.vault;
+    const over = [];
+    if (b.daily_over) over.push(tr('Günlük kasa bütçesi doldu ({n} token); zamanlı uyanışlar yarına kadar durdu.', { n: fmtTokens(v.daily_budget) }));
+    if (b.weekly_over) over.push(tr('Haftalık kasa bütçesi doldu ({n} token); zamanlı uyanışlar durdu.', { n: fmtTokens(v.weekly_budget) }));
+    alert.style.display = over.length ? '' : 'none';
+    clear(alert).append(over.map((t) => h('div', null, t)));
+    const todayNote = v.daily_budget ? tr('bütçe {n}', { n: fmtTokens(v.daily_budget) }) : '';
+    const weekNote = v.weekly_budget ? ` · ${tr('haftalık bütçe {n}', { n: fmtTokens(v.weekly_budget) })}` : '';
     clear(stats).append(
       stat(tr('Ekip'), `${active.length}/${snap.agents.length}`, working ? tr('{n} ajan çalışıyor', { n: working }) : tr('etkin / toplam ajan')),
-      stat(tr('Bugün harcanan token'), fmtTokens(tokensToday), tr('son 7 gün: {n}', { n: fmtTokens(tokens7) })),
+      stat(tr('Bugün harcanan token'), fmtTokens(tokensToday), `${todayNote ? `${todayNote} · ` : ''}${tr('son 7 gün: {n}', { n: fmtTokens(tokens7) })}${weekNote}`),
       stat(tr('Kuyruk'), `${snap.queue.running}`, tr('{n} iş sırada bekliyor', { n: snap.queue.queued })),
       stat(tr('Projeler'), snap.projects.length, tr('{n} proje notu', { n: snap.note_count })));
 

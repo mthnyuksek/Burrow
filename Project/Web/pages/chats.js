@@ -126,8 +126,19 @@ export default function create() {
         h('div', { class: 'md', html: renderMarkdown(m.text) })));
   }
 
+  // Running jobs of the agents writing in this conversation, with what they are doing right now.
+  function liveJobs(c) {
+    const ids = new Set((c.writers?.length ? c.writers : c.participants.slice(0, 1)).map((w) => w.id));
+    return (state.snap?.jobs || []).filter((j) => ids.has(j.agent_id));
+  }
+
+  async function stop() {
+    await call('chat.stop', { id: conv.id }).catch(showError);
+  }
+
   function drawConversation(forceScroll) {
-    const sig = conv ? `${conv.id}|${conv.messages.length}|${conv.busy}|${(conv.writers || []).map((w) => w.id).join(',')}|${conv.title}` : 'none';
+    const live = conv?.busy ? liveJobs(conv) : [];
+    const sig = conv ? `${conv.id}|${conv.messages.length}|${conv.busy}|${(conv.writers || []).map((w) => w.id).join(',')}|${conv.title}|${live.map((j) => `${j.id}:${j.activity.length}`).join(',')}` : 'none';
     if (sig === lastSig && !forceScroll) return;
     const nearBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 80;
     const switched = !lastSig.startsWith(conv ? `${conv.id}|` : 'none');
@@ -156,8 +167,15 @@ export default function create() {
     if (conv.busy) {
       // Show whoever is writing into this conversation; a chat whose agent waits for a colleague still shows the chat's agent.
       const writers = conv.writers?.length ? conv.writers : conv.participants.slice(0, 1);
+      const lines = live.flatMap((j) => j.activity).slice(-4);
+      const queued = live.length > 0 && live.every((j) => !j.running);
       transcript.append(h('div', { class: 'typing' }, avatar(writers[0]?.id, 34, true),
-        h('span', null, tr('{name} yazıyor', { name: writers.map((w) => w.name).join(', ') })), h('span', { class: 'dots' }, h('span'), h('span'), h('span'))));
+        h('div', { class: 'grow' },
+          h('div', { class: 'typing-line' },
+            h('span', null, queued ? tr('{name} sırada bekliyor', { name: writers.map((w) => w.name).join(', ') }) : tr('{name} yazıyor', { name: writers.map((w) => w.name).join(', ') })),
+            h('span', { class: 'dots' }, h('span'), h('span'), h('span'))),
+          lines.length ? h('div', { class: 'live' }, lines.map((l) => h('div', null, l))) : null),
+        button(tr('Durdur'), { kind: 'ghost', small: true, iconName: 'stop', onClick: stop })));
     }
     if (forceScroll || switched || nearBottom) transcript.scrollTop = transcript.scrollHeight;
 

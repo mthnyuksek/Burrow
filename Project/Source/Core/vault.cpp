@@ -6,6 +6,7 @@
 #include "Core/text.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace {
 constexpr const char* kConfigFile = "vault.ini";
@@ -87,6 +88,10 @@ void Vault::ReloadSettings() {
     const std::string last = fsx::LastDirName(root_);
     name_ = last.empty() ? root_ : last;
     language_ = "tr";
+    max_concurrent_ = 1;
+    max_hops_ = 8;
+    default_model_.clear();
+    daily_tokens_ = weekly_tokens_ = 0;
     std::string content;
     if (!ReadFile(Join(root_, kConfigFile), content))
         return;
@@ -96,6 +101,16 @@ void Vault::ReloadSettings() {
             name_ = line.substr(5);
         else if (str::StartsWith(line, "Language="))
             language_ = NormalizeLanguage(line.substr(9));
+        else if (str::StartsWith(line, "MaxConcurrent="))
+            max_concurrent_ = std::clamp(std::atoi(line.substr(14).c_str()), 1, 4);
+        else if (str::StartsWith(line, "MaxHops="))
+            max_hops_ = std::clamp(std::atoi(line.substr(8).c_str()), 1, 20);
+        else if (str::StartsWith(line, "DefaultModel="))
+            default_model_ = str::Trim(line.substr(13));
+        else if (str::StartsWith(line, "DailyTokens="))
+            daily_tokens_ = std::max(0L, std::atol(line.substr(12).c_str()));
+        else if (str::StartsWith(line, "WeeklyTokens="))
+            weekly_tokens_ = std::max(0L, std::atol(line.substr(13).c_str()));
     }
 }
 
@@ -104,14 +119,17 @@ std::string Vault::NormalizeLanguage(const std::string& code) {
 }
 
 bool Vault::SetLanguage(const std::string& code, std::string& error) {
-    const std::string lang = NormalizeLanguage(code);
+    return SetSetting("Language", NormalizeLanguage(code), error);
+}
+
+bool Vault::SetSetting(const std::string& key, const std::string& value, std::string& error) {
     std::string content;
     ReadFile(Join(root_, kConfigFile), content);
     std::vector<std::string> lines = str::Split(content, '\n');
     bool found = false;
     for (std::string& line : lines) {
-        if (str::StartsWith(str::Trim(line), "Language=")) {
-            line = "Language=" + lang;
+        if (str::StartsWith(str::Trim(line), key + "=")) {
+            line = key + "=" + value;
             found = true;
         }
     }
@@ -120,12 +138,12 @@ bool Vault::SetLanguage(const std::string& code, std::string& error) {
         if (!lines[i].empty() || i + 1 != lines.size())  // drop only the empty tail after the last newline
             out += lines[i] + "\n";
     if (!found)
-        out += "Language=" + lang + "\n";
+        out += key + "=" + value + "\n";
     if (!WriteFile(Join(root_, kConfigFile), out)) {
         error = "vault.ini yazılamadı.";
         return false;
     }
-    language_ = lang;
+    ReloadSettings();
     return true;
 }
 

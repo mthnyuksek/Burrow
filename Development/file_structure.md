@@ -23,7 +23,7 @@ Project (We keep the project source files here. When we hand the project to some
         mascot.js (SVG mascots, port of the old drawing code.)
         markdown.js (Small escaping Markdown renderer for agent answers.)
         pages (One module per tab.)
-            overview.js, agents.js, chats.js, projects.js, tasks.js, skills.js, rules.js, runs.js, settings.js (language for now)
+            overview.js, agents.js, chats.js, projects.js, tasks.js, skills.js, rules.js, runs.js (also the live job list and retry), settings.js (language, run limits, vault token budget)
     Resources (Windows resource files.)
         burrow.rc (Manifest resource and version info.)
         burrow.manifest (Windows 10/11 compatibility and per-monitor DPI awareness.)
@@ -67,7 +67,7 @@ README.md (Public introduction: what it is, build, limits.)
 LICENSE (MIT; the WebView2 files in Third_Party keep their own license.)
 
 Vault layout on disk (created by the application, not part of the source tree):
-    <vault>/vault.ini (Vault name and format version.)
+    <vault>/vault.ini (Vault name, format version, language, run limits, default model, token budget.)
     <vault>/Agents/<agent_id>.md (One file per agent.)
     <vault>/Tasks/<task_id>.md (One file per task.)
     <vault>/Skills/<skill_id>.md (One file per skill.)

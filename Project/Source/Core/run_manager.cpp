@@ -26,6 +26,30 @@ std::string BuiltinName(const std::string& tool) {
         return std::string();
     return str::BeforeFirst(tool, '(');
 }
+
+constexpr size_t kMaxActivityLines = 12;
+
+std::string Shorten(const std::string& text, size_t max_length) {
+    const std::string one_line = str::Trim(str::ReplaceAll(str::ReplaceAll(text, "\r", ""), "\n", " "));
+    return str::Utf8Length(one_line) > max_length ? str::Utf8Left(one_line, max_length) + "…" : one_line;
+}
+
+// One line for the live view out of an assistant content block: a tool call or a bit of text.
+std::string DescribeBlock(const Json& block) {
+    const std::string type = block["type"].AsString();
+    if (type == "text")
+        return Shorten(block["text"].AsString(), 140);
+    if (type != "tool_use")
+        return std::string();
+    const std::string name = block["name"].AsString();
+    const Json& in = block["input"];
+    for (const char* key : {"command", "file_path", "path", "pattern", "query", "url", "description"}) {
+        const std::string value = in[key].AsString();
+        if (!value.empty())
+            return "▸ " + name + ": " + Shorten(value, 110);
+    }
+    return "▸ " + name;
+}
 }  // namespace
 
 std::string JobSourceLabel(JobSource s) {
@@ -57,6 +81,7 @@ struct RunManager::Active {
     std::chrono::steady_clock::time_point started_at;
     bool cancelled = false;
     bool got_result = false;
+    std::vector<std::string> activity;
     RunResult result;
 };
 
@@ -76,6 +101,7 @@ RunManager::~RunManager() {
 void RunManager::SetVault(const std::string& root, const std::string& runs_dir) {
     root_ = root;
     runs_dir_ = runs_dir;
+    retryable_.clear();  // those jobs belong to the previous vault
 }
 
 void RunManager::Changed() {
@@ -152,6 +178,7 @@ void RunManager::RefreshUsage() {
 
 void RunManager::Enqueue(RunJob job) {
     job.vault_root = root_;
+    job.id = ++next_job_id_;
     queue_.push_back(std::move(job));
     Changed();
     Pump();
@@ -175,6 +202,88 @@ void RunManager::CancelAll() {
             a->process->Stop();
     }
     Changed();
+}
+
+bool RunManager::CancelJob(long job_id) {
+    for (auto it = queue_.begin(); it != queue_.end(); ++it) {
+        if (it->id != job_id || it->source == JobSource::Probe)
+            continue;
+        RunResult r;
+        r.job = *it;
+        r.status = RunStatus::Stopped;
+        r.text = "Sıradayken durduruldu.";
+        queue_.erase(it);
+        Complete(r, true);
+        return true;
+    }
+    for (auto& a : active_) {
+        if (a->job.id == job_id && a->job.source != JobSource::Probe && !a->cancelled) {
+            a->cancelled = true;
+            if (a->process)
+                a->process->Stop();
+            Changed();
+            return true;
+        }
+    }
+    return false;
+}
+
+void RunManager::CancelConversation(const std::string& conversation_id) {
+    std::vector<long> ids;
+    auto involves = [&](const RunJob& job) {
+        return std::any_of(job.reply_stack.begin(), job.reply_stack.end(),
+                           [&](const ReplyFrame& f) { return f.conversation_id == conversation_id; });
+    };
+    for (const auto& a : active_)
+        if (involves(a->job))
+            ids.push_back(a->job.id);
+    for (const RunJob& j : queue_)
+        if (involves(j))
+            ids.push_back(j.id);
+    for (long id : ids)
+        CancelJob(id);
+}
+
+bool RunManager::CanRetry(const std::string& run_id) const {
+    return std::any_of(retryable_.begin(), retryable_.end(), [&](const auto& p) { return p.first == run_id; });
+}
+
+bool RunManager::Retry(const std::string& run_id) {
+    for (auto it = retryable_.begin(); it != retryable_.end(); ++it) {
+        if (it->first != run_id)
+            continue;
+        RunJob job = it->second;
+        retryable_.erase(it);
+        Enqueue(std::move(job));
+        return true;
+    }
+    return false;
+}
+
+std::vector<JobInfo> RunManager::Jobs() const {
+    std::vector<JobInfo> out;
+    auto fill = [](const RunJob& job, bool running) {
+        JobInfo i;
+        i.id = job.id;
+        i.running = running;
+        i.agent_id = job.agent_id;
+        i.agent_name = job.agent_name;
+        i.task_name = job.task_name;
+        i.conversation_id = job.ConversationId();
+        return i;
+    };
+    for (const auto& a : active_) {
+        if (a->job.source == JobSource::Probe)
+            continue;
+        JobInfo i = fill(a->job, true);
+        i.started = a->started;
+        i.activity = a->activity;
+        out.push_back(std::move(i));
+    }
+    for (const RunJob& j : queue_)
+        if (j.source != JobSource::Probe)
+            out.push_back(fill(j, false));
+    return out;
 }
 
 // Picks the next job: highest priority first, oldest first within a priority.
@@ -256,8 +365,9 @@ std::string RunManager::BuildCommand(const RunJob& job, const std::string& syste
     if (!allowed.empty())
         cmd += " --allowedTools " + Quote(allowed);
 
-    if (!job.model.empty())
-        cmd += " --model " + Quote(job.model);
+    const std::string& model = job.model.empty() ? default_model : job.model;
+    if (!model.empty())
+        cmd += " --model " + Quote(model);
     if (job.max_turns > 0)
         cmd += " --max-turns " + std::to_string(job.max_turns);
     for (const std::string& config : job.mcp_configs)
@@ -330,6 +440,21 @@ void RunManager::HandleLine(Active* a, const std::string& line) {
     if (type == "system" && j["subtype"].AsString() == "init") {
         a->result.session_id = j["session_id"].AsString();
         a->result.model = j["model"].AsString();
+    } else if (type == "assistant") {
+        const Json& content = j["message"]["content"];
+        bool added = false;
+        for (size_t i = 0; i < content.Size(); ++i) {
+            const std::string line = DescribeBlock(content.At(i));
+            if (line.empty())
+                continue;
+            a->activity.push_back(line);
+            added = true;
+        }
+        if (added) {
+            if (a->activity.size() > kMaxActivityLines)
+                a->activity.erase(a->activity.begin(), a->activity.end() - kMaxActivityLines);
+            Changed();
+        }
     } else if (type == "result") {
         a->got_result = true;
         RunResult& r = a->result;
@@ -396,6 +521,11 @@ void RunManager::Complete(RunResult result, bool save_record) {
             result.job.vault_root.empty() ? runs_dir_ : fsx::Join(result.job.vault_root, "Runs");
         fsx::MakeDirs(dir);
         rec.Save(dir);
+    }
+    if (result.status != RunStatus::Done && result.job.source != JobSource::Probe) {
+        retryable_.emplace_back(result.run_id, result.job);
+        if (retryable_.size() > 30)
+            retryable_.erase(retryable_.begin());
     }
     if (on_finished && result.job.source != JobSource::Probe)
         on_finished(result);

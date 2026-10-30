@@ -20,14 +20,19 @@ std::vector<SkillTemplate> BuildTemplates() {
 
     all.push_back(Make(
         "kasa_ayarlari", "Kasa ayarlarını düzenleme",
-        "Mevcut kasanın ayarlarını (kasa adı, arayüz dili) düzenler.", "Read, Edit",
+        "Mevcut kasanın ayarlarını (kasa adı, dil, çalışma sınırları, token bütçesi) düzenler.", "Read, Edit",
         R"(Kasa ayarları kasa klasöründeki vault.ini dosyasındadır. Çalışma klasörün kasa klasörüdür.
 Biçimi:
 [Vault]
 Name=Kasa adı
 Version=2
 Language=tr
-Name: kasa adı. Language: arayüz dili, tr (Türkçe) ya da en (English); başka değer yazma.
+MaxConcurrent=1
+MaxHops=8
+DefaultModel=
+DailyTokens=0
+WeeklyTokens=0
+Name: kasa adı. Language: arayüz dili, tr (Türkçe) ya da en (English); başka değer yazma. MaxConcurrent: aynı anda çalışan iş (1-4). MaxHops: ajanlar arası zincir adımı (1-20). DefaultModel: model belirtilmemişse kullanılan model, boş olabilir. DailyTokens / WeeklyTokens: tüm kasanın token bütçesi, 0 = sınırsız. Son beş satır isteğe bağlıdır; yoksa dosyanın sonuna ekle.
 Kullanıcı ne isterse sadece ilgili satırı değiştir, Version'a dokunma. Language satırı yoksa dosyanın sonuna ekle. Önce dosyayı oku, sonra Edit ile değiştir.
 Değişiklik bu çalıştırma bitince uygulamaya yansır; bunu kullanıcıya söyle.)",
         true));
