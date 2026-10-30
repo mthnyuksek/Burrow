@@ -556,8 +556,13 @@ void WebFrame::OnRunFinished(const RunResult& r) {
     // The answer to a message that came from Telegram goes back there (once, the chain's final answer).
     if (!job.reply_stack.empty() && job.reply_stack.back().agent_id == "user" &&
         telegram_pending_.erase(job.reply_stack.back().conversation_id) > 0) {
-        const std::string answer = r.status == RunStatus::Done ? ParseReply(r.text).text
-                                                               : "(" + RunStatusLabel(r.status) + ") " + r.text;
+        // Send exactly what the router wrote into the chat, so Burrow and Telegram never differ.
+        ConversationInfo info;
+        std::vector<ConvMessage> written;
+        std::string answer;
+        if (store_->Load(job.reply_stack.back().conversation_id, info, written) && !written.empty() &&
+            written.back().from == job.agent_id && written.back().to == "user")
+            answer = written.back().text;
         SendTelegram(answer.empty() ? std::string("(boş cevap)") : answer);
     }
     PushChanged();
@@ -665,8 +670,12 @@ void WebFrame::HandleTelegramText(const std::string& raw) {
     std::vector<ConvMessage> messages;
     store_->Load(conversation, info, messages);
     store_->Append(conversation, {std::string(), "user", agent->id, text});
-    RunJob job = MakeChatJob(team, *agent, conversation, info.session_id, text, info.project, false);
-    job.prompt += "\n\n(Bu mesaj Telegram'dan geldi; cevabın Telegram'a iletilecek, kısa tut.)";
+    // The whole answer goes to Telegram as it is, so the agent needs no Telegram skill text for this job.
+    AgentDefinition replying = *agent;
+    replying.skills.erase(std::remove(replying.skills.begin(), replying.skills.end(), std::string(kTelegramSkillId)),
+                          replying.skills.end());
+    RunJob job = MakeChatJob(team, replying, conversation, info.session_id, text, info.project, false);
+    job.prompt += "\n\n(Bu mesaj Telegram'dan geldi; cevabın aynen Telegram'a iletilecek, kısa tut.)";
     telegram_pending_.insert(conversation);
     runs_.Enqueue(job);
     PushChanged();
