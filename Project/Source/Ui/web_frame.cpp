@@ -58,6 +58,7 @@ WebFrame::~WebFrame() {
     runs_.on_finished = nullptr;
     if (poller_)
         poller_->stop = true;
+    SetThreadExecutionState(ES_CONTINUOUS);
     if (hwnd_) {
         SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
         DestroyWindow(hwnd_);
@@ -112,6 +113,9 @@ bool WebFrame::Create() {
     UpdateTitle();
     SetTimer(hwnd_, kRunTimerId, kRunTickMs, nullptr);
     RestartTelegramPoller();
+    // The computer must stay awake while Burrow is open: scheduled wake-ups and Telegram messages only
+    // work then. The screen may still turn off. Lasts until the window is destroyed (or the process ends).
+    SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
 
     host_.on_message = [this](const std::string& body) {
         Post([this, body] { OnPageMessage(body); });  // leave the WebView2 callback first
