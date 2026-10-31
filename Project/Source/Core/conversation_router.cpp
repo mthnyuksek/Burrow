@@ -32,6 +32,9 @@ void ConversationRouter::RouteSend(const TeamContext& team, const AgentDefinitio
         note = "(Gönderilemedi: " + target->name + " uykuda.)";
     else if (job.hops + 1 > MaxAgentHops())
         note = "(Zincir sınırına ulaşıldı, mesaj iletilmedi.)";
+    else if (send.expects_reply && runs_->HasPendingRequest(target->id, from.id))
+        note = "(" + target->name + " senin önceki isteğin üzerinde zaten çalışıyor; aynı isteği tekrar göndermedim. "
+               "Sonuç gelince sana bildirilecek.)";
 
     const ReplyFrame* receiver = job.reply_stack.empty() ? nullptr : &job.reply_stack.back();
     if (!note.empty()) {

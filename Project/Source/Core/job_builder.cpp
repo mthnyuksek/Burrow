@@ -191,6 +191,7 @@ RunJob MakeReportJob(const TeamContext& team, const AgentDefinition& agent, cons
     RunJob job = BaseJob(team, agent, nullptr, Asked::No, project_id);
     job.source = JobSource::Agent;
     job.reply_stack = reply_stack;
+    job.is_report = true;
     job.hops = hops;
     job.prompt = from.name + " istediğin işi bitirdi ve şunu bildirdi:\n" + result +
                  "\n\nBu sonucu değerlendir ve işi isteyen kişiye kısaca bildir.";

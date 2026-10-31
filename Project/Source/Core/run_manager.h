@@ -38,6 +38,7 @@ struct RunJob {
     // is waiting (wake-ups, manual runs).
     std::vector<ReplyFrame> reply_stack;
     bool expects_reply = true;  // false: the sender wants no answer back (information only)
+    bool is_report = false;     // an asker is told the result of the work it asked for (not a request)
     bool name_chat = false;     // the answer may carry <title>..</title> that names the user's chat
     int hops = 0;               // how many agent-to-agent steps led to this job
 
@@ -83,7 +84,8 @@ struct JobInfo {
 };
 
 // Queues jobs, runs at most max_concurrent of them at a time (highest priority
-// first), applies the usage gate and reports results. Lives on the GUI thread.
+// first, never two jobs of the same agent together), applies the usage gate and reports
+// results. Lives on the GUI thread.
 class RunManager {
 public:
     RunManager();
@@ -113,6 +115,9 @@ public:
     size_t QueuedCount() const { return queue_.size(); }
     size_t RunningCount() const { return active_.size(); }
     bool IsAgentBusy(const std::string& agent_id) const;
+    // True while a queued or running request from agent `from` to agent `to` (a <send> that expects
+    // an answer) has not finished: asking again would only repeat the same work.
+    bool HasPendingRequest(const std::string& to, const std::string& from) const;
     // True while a queued or running job still has to write into this conversation.
     bool IsConversationActive(const std::string& conversation_id) const;
     // Agents whose queued or running job will write its answer into exactly this conversation.

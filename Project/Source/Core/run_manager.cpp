@@ -117,6 +117,17 @@ bool RunManager::IsAgentBusy(const std::string& agent_id) const {
                        [&](const RunJob& j) { return j.agent_id == agent_id; });
 }
 
+bool RunManager::HasPendingRequest(const std::string& to, const std::string& from) const {
+    auto matches = [&](const RunJob& j) {
+        return j.source == JobSource::Agent && !j.is_report && j.expects_reply && j.agent_id == to &&
+               !j.reply_stack.empty() && j.reply_stack.back().agent_id == from;
+    };
+    for (const auto& a : active_)
+        if (matches(a->job))
+            return true;
+    return std::any_of(queue_.begin(), queue_.end(), matches);
+}
+
 bool RunManager::IsConversationActive(const std::string& conversation_id) const {
     auto involves = [&](const RunJob& job) {
         return std::any_of(job.reply_stack.begin(), job.reply_stack.end(),
@@ -296,6 +307,12 @@ void RunManager::Pump() {
         bool waiting_for_usage = false;
         for (size_t i = 0; i < queue_.size(); ++i) {
             const RunJob& j = queue_[i];
+            // One agent never works twice at once: two runs would repeat the same work, fight over
+            // the same files and resume the same Claude session. It waits for the running one.
+            if (j.source != JobSource::Probe &&
+                std::any_of(active_.begin(), active_.end(),
+                            [&](const auto& a) { return a->job.agent_id == j.agent_id; }))
+                continue;
             if (j.min_remaining <= 0 || j.source == JobSource::Probe) {
                 pick = i;
                 break;

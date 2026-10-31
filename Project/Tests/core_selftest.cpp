@@ -494,6 +494,26 @@ void TestConversationsAndJobs() {
     CHECK(report.agent_id == "ali" && report.resume_session == "sess" && report.persist_session &&
           Has(report.prompt, "Sonuç 42") && report.ConversationId() == "c0");
 
+    // A second request from the same sender to the same agent is held back while the first is pending.
+    {
+        const std::string runs_dir = FreshDir("burrow_selftest_pending");
+        fsx::MakeDirs(runs_dir);  // CancelAll writes run records, keep them out of the working folder
+        RunManager pending;
+        pending.SetVault(runs_dir, runs_dir);
+        pending.max_concurrent = 0;  // nothing starts, the jobs stay queued
+        CHECK(!pending.HasPendingRequest("veli", "ali"));
+        pending.Enqueue(MakeAgentMessageJob(team, veli, ali, "Ölç", stack, 1, true));
+        CHECK(pending.HasPendingRequest("veli", "ali") && !pending.HasPendingRequest("veli", "can") &&
+              !pending.HasPendingRequest("ali", "veli"));
+        pending.CancelAll();
+        CHECK(!pending.HasPendingRequest("veli", "ali"));
+        pending.Enqueue(MakeAgentMessageJob(team, veli, ali, "FYI", stack, 1, false));  // information only
+        pending.Enqueue(MakeReportJob(team, veli, ali, "Sonuç", stack, "", 2));          // a report, not a request
+        CHECK(!pending.HasPendingRequest("veli", "ali"));
+        pending.CancelAll();
+        fsx::RemoveDirRecursive(runs_dir);
+    }
+
     // Company rules reach every agent's prompt; disabled ones do not.
     team.rules = {{"r1", "Hitap", true, "Kullanıcıya \"efendim\" diye hitap et."},
                   {"r2", "Kapalı", false, "BU KURAL KAPALI"}};
