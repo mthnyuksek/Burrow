@@ -15,7 +15,7 @@
 //   Tasks/      - one .md file per task
 //   Skills/     - one .md file per skill
 //   Rules/      - one .md file per company rule (added to every agent's prompt)
-//   Projects/   - one folder per project: project.md and Notes/ (persistent project memory)
+//   Projects/   - one folder per project, data in hidden .Burrow/: project.md and Notes/ (persistent project memory)
 //   Conversations/ - one .jsonl file per chat / agent conversation
 //   Runs/       - one .md record per Claude Code run
 class Vault {
@@ -57,7 +57,7 @@ public:
     bool SaveRule(RuleDefinition& rule, std::string& error) const;
     bool DeleteRule(const RuleDefinition& rule, std::string& error) const;
 
-    // Projects/<id>/project.md plus Projects/<id>/Notes/*.md. LoadProjects fills in the notes.
+    // Projects/<id>/.Burrow/project.md plus .Burrow/Notes/*.md (old layout is migrated on load). LoadProjects fills in the notes.
     std::vector<ProjectDefinition> LoadProjects() const;
     bool SaveProject(ProjectDefinition& project, std::string& error) const;  // saves project.md only
     bool DeleteProject(const ProjectDefinition& project, std::string& error) const;  // with all its notes

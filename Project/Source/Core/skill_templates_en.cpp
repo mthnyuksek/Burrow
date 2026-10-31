@@ -70,12 +70,13 @@ Before adding a rule look at the existing ones; if one already says the same thi
     {"proje_notlari", "Project notes",
      "Reads and edits projects and the permanent notes (memory) of projects.",
      R"(Projects are the Projects/<project_id>/ folders in the vault. Your working folder is the vault folder.
-Project summary: Projects/<project_id>/project.md
+Project files are in the hidden folder Projects/<project_id>/.Burrow/ (give Glob the full path of that folder).
+Project summary: Projects/<project_id>/.Burrow/project.md
 ---
 name: Project name
 ---
 A short summary and the purpose of the project.
-Project notes (the permanent memory of the project): Projects/<project_id>/Notes/<note_id>.md
+Project notes (the permanent memory of the project): Projects/<project_id>/.Burrow/Notes/<note_id>.md
 ---
 name: Title of the note
 enabled: true
@@ -84,7 +85,7 @@ Note text.
 EVERY agent that works or chats in a project reads the summary and the enabled notes by itself on every run, so all of it costs tokens. Write only lasting, short information: decisions, rules, preferences, the state of the project. Do not write temporary or long text.
 Before adding a note look at the existing notes with Glob; if there is a note on the same topic, edit it. Set an outdated note to enabled: false. You cannot delete files; point a user who wants to delete to the Delete button on the Projects tab.
 If the system prompt has a "Proje" heading you are in that project now: when the user says "take a note", "don't forget", "remember", write to that project's Notes folder. Change another project's notes only if the user asks.
-New project: <project_id> is lowercase letters, digits and _; create the file Projects/<project_id>/project.md (Write creates the Notes folder by itself).)"},
+New project: <project_id> is lowercase letters, digits and _; create the file Projects/<project_id>/.Burrow/project.md (Write creates the folders by itself).)"},
 
     {"web_arastirma", "Web research",
      "Searches the internet and reads pages.",

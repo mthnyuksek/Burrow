@@ -14,6 +14,8 @@ bool AppendFile(const std::string& path, const std::string& content);
 bool FileExists(const std::string& path);
 bool DirExists(const std::string& path);
 bool MakeDirs(const std::string& path);  // the whole chain; true if it exists afterwards
+bool Rename(const std::string& from, const std::string& to);  // file or folder, same volume
+void SetHidden(const std::string& path);                       // Windows hidden attribute (a leading dot alone does not hide)
 bool RemoveFile(const std::string& path);
 bool RemoveDirRecursive(const std::string& path);
 bool Copy(const std::string& from, const std::string& to);

@@ -81,12 +81,13 @@ Kural eklemeden önce mevcut kurallara bak; aynı şeyi söyleyen bir kural vars
         "proje_notlari", "Proje notları",
         "Projeleri ve projelerin kalıcı notlarını (hafızasını) okur ve düzenler.", "Read, Write, Edit, Glob",
         R"(Projeler kasadaki Projects/<proje_id>/ klasörlerindedir. Çalışma klasörün kasa klasörüdür.
-Proje özeti: Projects/<proje_id>/project.md
+Proje dosyaları gizli Projects/<proje_id>/.Burrow/ klasöründedir (Glob'a bu klasörün tam yolunu ver).
+Proje özeti: Projects/<proje_id>/.Burrow/project.md
 ---
 name: Proje adı
 ---
 Projenin kısa özeti ve amacı.
-Proje notları (projenin kalıcı hafızası): Projects/<proje_id>/Notes/<not_id>.md
+Proje notları (projenin kalıcı hafızası): Projects/<proje_id>/.Burrow/Notes/<not_id>.md
 ---
 name: Notun başlığı
 enabled: true
@@ -95,7 +96,7 @@ Not metni.
 Bir projede çalışan ya da sohbet eden HER ajan özeti ve etkin notları her çalıştırmada kendiliğinden okur; bu yüzden hepsi token harcar. Sadece kalıcı ve kısa bilgi yaz: kararlar, kurallar, tercihler, projenin durumu. Geçici ya da uzun metin yazma.
 Not eklemeden önce Glob ile mevcut notlara bak; aynı konuda not varsa onu düzenle. Eskiyen notu enabled: false yap. Dosya silemezsin; silmek isteyen kullanıcıya Projeler sekmesindeki Sil düğmesini göster.
 Sistem isteminde "Proje" başlığı varsa şu an o projedesin: kullanıcı "not al", "unutma", "hatırla" derse o projenin Notes klasörüne yaz. Başka projenin notlarını sadece kullanıcı isterse değiştir.
-Yeni proje: <proje_id> küçük harf, rakam ve _ olsun; Projects/<proje_id>/project.md dosyasını oluştur (Notes klasörünü Write kendiliğinden açar).)",
+Yeni proje: <proje_id> küçük harf, rakam ve _ olsun; Projects/<proje_id>/.Burrow/project.md dosyasını oluştur (klasörleri Write kendiliğinden açar).)",
         true));
 
     all.push_back(Make(

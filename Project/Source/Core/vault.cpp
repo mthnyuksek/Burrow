@@ -229,16 +229,39 @@ bool Vault::DeleteRule(const RuleDefinition& rule, std::string& error) const {
     return true;
 }
 
+// Project data lives in the hidden Projects/<id>/.Burrow/ folder (project.md + Notes/).
+static std::string ProjectDataDir(const std::string& project_folder) { return fsx::Join(project_folder, ".Burrow"); }
+
+// Moves the old layout (project.md and Notes/ directly in the project folder) into .Burrow and keeps
+// the folder hidden (an agent's Write may have created it visible).
+static void MigrateProjectFolder(const std::string& folder) {
+    const std::string data = ProjectDataDir(folder);
+    const std::string old_md = fsx::Join(folder, "project.md");
+    const std::string old_notes = fsx::Join(folder, "Notes");
+    const bool has_old_md = fsx::FileExists(old_md) && !fsx::FileExists(fsx::Join(data, "project.md"));
+    const bool has_old_notes = fsx::DirExists(old_notes) && !fsx::DirExists(fsx::Join(data, "Notes"));
+    if (has_old_md || has_old_notes)
+        fsx::MakeDirs(data);
+    if (has_old_md)
+        fsx::Rename(old_md, fsx::Join(data, "project.md"));
+    if (has_old_notes)
+        fsx::Rename(old_notes, fsx::Join(data, "Notes"));
+    if (fsx::DirExists(data))
+        fsx::SetHidden(data);
+}
+
 std::vector<ProjectDefinition> Vault::LoadProjects() const {
     std::vector<ProjectDefinition> projects;
     const std::string root = SubDir("Projects");
     for (const std::string& folder : fsx::ListDirs(root)) {
         std::string content;
         ProjectDefinition project;
-        if (!ReadFile(Join(Join(root, folder), "project.md"), content) ||
+        const std::string data = ProjectDataDir(Join(root, folder));
+        MigrateProjectFolder(Join(root, folder));
+        if (!ReadFile(Join(data, "project.md"), content) ||
             !ProjectDefinition::Parse(folder, content, project))
             continue;
-        project.notes = LoadAll<ProjectNote>(Join(Join(root, folder), "Notes"), ProjectNote::Parse);
+        project.notes = LoadAll<ProjectNote>(Join(data, "Notes"), ProjectNote::Parse);
         std::sort(project.notes.begin(), project.notes.end(), [](const ProjectNote& a, const ProjectNote& b) {
             return str::CmpNoCase(a.name, b.name) < 0;
         });
@@ -256,10 +279,13 @@ bool Vault::SaveProject(ProjectDefinition& project, std::string& error) const {
             project.id = base + "_" + std::to_string(n);
     }
     const std::string folder = Join(root, project.id);
-    if (!fsx::MakeDirs(Join(folder, "Notes")) || !WriteFile(Join(folder, "project.md"), project.Serialize())) {
+    MigrateProjectFolder(folder);
+    const std::string data = ProjectDataDir(folder);
+    if (!fsx::MakeDirs(Join(data, "Notes")) || !WriteFile(Join(data, "project.md"), project.Serialize())) {
         error = "Proje dosyası yazılamadı.";
         return false;
     }
+    fsx::SetHidden(data);
     return true;
 }
 
@@ -272,8 +298,11 @@ bool Vault::DeleteProject(const ProjectDefinition& project, std::string& error) 
 }
 
 bool Vault::SaveNote(const std::string& project_id, ProjectNote& note, std::string& error) const {
-    const std::string dir = Join(Join(SubDir("Projects"), project_id), "Notes");
+    const std::string folder = Join(SubDir("Projects"), project_id);
+    MigrateProjectFolder(folder);
+    const std::string dir = Join(ProjectDataDir(folder), "Notes");
     fsx::MakeDirs(dir);
+    fsx::SetHidden(ProjectDataDir(folder));
     if (note.id.empty())
         AssignUniqueId(dir, note.name, note.id);
     if (!WriteFile(Join(dir, note.id + ".md"), note.Serialize())) {
@@ -284,7 +313,7 @@ bool Vault::SaveNote(const std::string& project_id, ProjectNote& note, std::stri
 }
 
 bool Vault::DeleteNote(const std::string& project_id, const ProjectNote& note, std::string& error) const {
-    if (!fsx::RemoveFile(Join(Join(Join(SubDir("Projects"), project_id), "Notes"), note.id + ".md"))) {
+    if (!fsx::RemoveFile(Join(Join(ProjectDataDir(Join(SubDir("Projects"), project_id)), "Notes"), note.id + ".md"))) {
         error = "Not dosyası silinemedi.";
         return false;
     }

@@ -232,6 +232,18 @@ void TestProjects() {
     CHECK(loaded.size() == 1 && loaded[0].name == p.name && loaded[0].notes.size() == 2);
     CHECK(loaded[0].EstimatedTokens() > 0);
 
+    // Data sits in the hidden .Burrow folder; the old layout is migrated on load.
+    {
+        const std::string pdir = fsx::Join(fsx::Join(vault.Root(), "Projects"), p.id);
+        CHECK(fsx::FileExists(fsx::Join(fsx::Join(pdir, ".Burrow"), "project.md")));
+        CHECK(!fsx::FileExists(fsx::Join(pdir, "project.md")) && !fsx::DirExists(fsx::Join(pdir, "Notes")));
+        CHECK(fsx::Rename(fsx::Join(fsx::Join(pdir, ".Burrow"), "project.md"), fsx::Join(pdir, "project.md")));
+        CHECK(fsx::Rename(fsx::Join(fsx::Join(pdir, ".Burrow"), "Notes"), fsx::Join(pdir, "Notes")));
+        const std::vector<ProjectDefinition> migrated = vault.LoadProjects();
+        CHECK(migrated.size() == 1 && migrated[0].notes.size() == 2);
+        CHECK(fsx::FileExists(fsx::Join(fsx::Join(pdir, ".Burrow"), "project.md")) && !fsx::FileExists(fsx::Join(pdir, "project.md")));
+    }
+
     // Only the enabled notes reach the prompt, and only for jobs of that project.
     TeamContext team;
     team.projects = loaded;

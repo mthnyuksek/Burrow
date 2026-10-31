@@ -95,6 +95,19 @@ bool fsx::MakeDirs(const std::string& path) {
     return DirExists(path);
 }
 
+bool fsx::Rename(const std::string& from, const std::string& to) {
+    std::error_code ec;
+    stdfs::rename(P(from), P(to), ec);
+    return !ec;
+}
+
+void fsx::SetHidden(const std::string& path) {
+    const std::wstring wide = winstr::Widen(path);
+    const DWORD attrs = GetFileAttributesW(wide.c_str());
+    if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_HIDDEN))
+        SetFileAttributesW(wide.c_str(), attrs | FILE_ATTRIBUTE_HIDDEN);
+}
+
 bool fsx::RemoveFile(const std::string& path) {
     std::error_code ec;
     return stdfs::remove(P(path), ec) && !ec;

@@ -10,8 +10,8 @@
 // rule (name, enabled, body, token estimate), so it reuses that type.
 using ProjectNote = RuleDefinition;
 
-// A project is a folder <vault>/Projects/<id>/ with project.md (name + summary) and
-// Notes/<note_id>.md. Chats, wake-ups and agent messages can belong to a project; the job
+// A project is a folder <vault>/Projects/<id>/ with .Burrow/project.md (name + summary) and
+// .Burrow/Notes/<note_id>.md. Chats, wake-ups and agent messages can belong to a project; the job
 // builder then adds the summary and the enabled notes to the agent's system prompt.
 struct ProjectDefinition {
     std::string id;  // folder name
