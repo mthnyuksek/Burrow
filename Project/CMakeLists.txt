@@ -16,6 +16,7 @@ add_library(burrow_core STATIC
     Source/Core/markdown_file.cpp
     Source/Core/platform.cpp
     Source/Core/project_definition.cpp
+    Source/Core/remote_config.cpp
     Source/Core/rule_definition.cpp
     Source/Core/run_manager.cpp
     Source/Core/run_record.cpp
@@ -56,7 +57,9 @@ add_executable(burrow WIN32
     Source/Ui/burrow_app.cpp
     Source/Ui/embedded_web.cpp
     Source/Ui/folder_dialog.cpp
+    Source/Ui/remote_server.cpp
     Source/Ui/telegram_client.cpp
+    Source/Ui/tunnel.cpp
     Source/Ui/web_api.cpp
     Source/Ui/web_frame.cpp
     Source/Ui/web_view_host.cpp
@@ -65,7 +68,7 @@ add_executable(burrow WIN32
 )
 target_include_directories(burrow PRIVATE Third_Party/Web_View2/Include)
 target_compile_definitions(burrow PRIVATE UNICODE _UNICODE)
-target_link_libraries(burrow PRIVATE burrow_core ole32 oleaut32 shlwapi shell32 uuid dwmapi winhttp)
+target_link_libraries(burrow PRIVATE burrow_core ole32 oleaut32 shlwapi shell32 uuid dwmapi winhttp ws2_32 bcrypt)
 target_link_options(burrow PRIVATE -static)
 
 # Self test of the core: cmake -DBURROW_BUILD_TESTS=ON, run `core_selftest [--live]`.

@@ -6,6 +6,7 @@
 #include "Core/job_builder.h"
 #include "Core/json.h"
 #include "Core/run_manager.h"
+#include "Core/remote_config.h"
 #include "Core/run_record.h"
 #include "Core/scheduler.h"
 #include "Core/skill_definition.h"
@@ -13,7 +14,9 @@
 #include "Core/telegram_config.h"
 #include "Core/vault.h"
 #include "Core/vault_registry.h"
+#include "Ui/remote_server.h"
 #include "Ui/telegram_client.h"
+#include "Ui/tunnel.h"
 #include "Ui/web_view_host.h"
 
 #include <windows.h>
@@ -85,6 +88,15 @@ private:
     void HandleTelegramText(const std::string& text);
     void SetScheduler(bool on);
 
+    // Friends joining over the internet (remote_server.h, tunnel.h). Commands from them arrive on a
+    // server thread and are run here on the UI thread by HandleRemote, after the role check.
+    std::string RemoteFile() const;
+    std::string HandleRemote(const RemoteInvite& who, const std::string& body);
+    void SetRemote(bool on);
+    void CheckTunnel();  // pushes a change when the tunnel's state moved on its own
+    Json RemoteJson() const;
+    std::string InviteLink(const RemoteInvite& invite) const;
+
     // Commands (web_api.cpp). Throws ApiError for mistakes of the user.
     Json Dispatch(const std::string& cmd, const Json& args);
     Json ChatList() const;
@@ -141,6 +153,11 @@ private:
     bool suppress_telegram_ = false;  // while the router handles an answer that goes to Telegram anyway
     std::set<std::string> telegram_pending_;  // chats with a Telegram message in work: the answer goes back
     bool scheduler_on_ = false;
+    RemoteConfig remote_config_;  // invites, loaded at start
+    RemoteServer remote_;
+    Tunnel tunnel_;
+    std::string caller_role_ = "owner";  // "owner" for the window, the invite's role while a friend's command runs
+    std::string last_tunnel_sig_;
 
     WebViewHost host_;
     std::string start_page_;

@@ -39,7 +39,7 @@ bool FindEmbeddedFile(const std::string& path, const unsigned char*& data, size_
     // disk, so a page edit needs no rebuild (reload with Ctrl+R in the window).
     static const char* const dev_dir = std::getenv("BURROW_WEB_DIR");
     if (dev_dir && path.rfind("web/", 0) == 0) {
-        static std::string buffer;  // valid until the next call; callers copy it at once
+        thread_local std::string buffer;  // valid until this thread's next call; callers copy it at once (server threads run in parallel)
         std::ifstream in(std::string(dev_dir) + "/" + path.substr(4), std::ios::binary);
         if (!in)
             return false;

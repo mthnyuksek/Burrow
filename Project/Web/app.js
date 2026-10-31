@@ -1,6 +1,6 @@
 // Shell: sidebar, top bar with the usage gauges, and the pages. Pages stay alive when hidden,
 // so a half-written chat message or a selection survives switching tabs.
-import { call, on, connected } from './api.js';
+import { call, on, connected, isRemote } from './api.js';
 import { state, setSnapshot, subscribe } from './state.js';
 import { h, icon, clear, button, showError, clockTime } from './ui.js';
 import { mascotEl } from './mascot.js';
@@ -33,7 +33,7 @@ const root = document.getElementById('root');
 let current = null;
 const instances = new Map();
 const navButtons = new Map();
-let title, gauges, queueChip, schedulerBox, vaultName, content;
+let title, gauges, queueChip, schedulerBox, vaultName, content, swapButton, schedulerLabel, roleChip;
 
 function buildShell() {
   const nav = h('nav', { class: 'sidebar' },
@@ -48,7 +48,7 @@ function buildShell() {
     h('div', { class: 'nav-spacer' }),
     h('div', { class: 'vault-box' },
       h('div', { class: 'meta' }, h('div', { class: 'label' }, tr('Kasa')), (vaultName = h('div', { class: 'name' }))),
-      button('', { kind: 'ghost', iconName: 'swap', title: tr('Kasa değiştir'), onClick: () => openVaultPicker() })));
+      (swapButton = button('', { kind: 'ghost', iconName: 'swap', title: tr('Kasa değiştir'), onClick: () => openVaultPicker() }))));
 
   title = h('div', { class: 'page-title' });
   gauges = h('div', { style: { display: 'flex', gap: '18px' } });
@@ -59,9 +59,9 @@ function buildShell() {
   });
   schedulerBox = schedulerInput;
   const topbar = h('div', { class: 'topbar' },
-    title, queueChip, gauges,
-    h('label', { class: 'switch', title: tr('Açıkken uyanış saati gelen görevler kendiliğinden çalışır') },
-      schedulerInput, h('span', { class: 'track' }), tr('Zamanlayıcı')),
+    title, queueChip, (roleChip = h('span', { class: 'chip warn', hidden: true })), gauges,
+    (schedulerLabel = h('label', { class: 'switch', title: tr('Açıkken uyanış saati gelen görevler kendiliğinden çalışır') },
+      schedulerInput, h('span', { class: 'track' }), tr('Zamanlayıcı'))),
     button('', { kind: 'ghost', iconName: 'refresh', title: tr('Kullanımı yenile'), onClick: () => call('usage.refresh').catch(showError) }),
     button(tr('Hepsini durdur'), { kind: 'danger', small: true, iconName: 'stop', onClick: () => call('runs.stopAll').catch(showError) }));
 
@@ -90,6 +90,18 @@ function renderChrome(snap) {
   navButtons.get('agents').querySelector('.badge')?.remove();
   if (workingCount) navButtons.get('agents').append(h('span', { class: 'badge' }, workingCount));
   if (sel) title.textContent = sel.label;
+}
+
+// A friend who joined through an invite link: settings, vaults and the scheduler stay with the owner
+// (the program refuses those commands anyway); a viewer also sees a note that he can only look.
+function applyRole(snap) {
+  if (snap.role === 'owner') return;
+  navButtons.get('settings').style.display = 'none';
+  swapButton.style.display = 'none';
+  schedulerLabel.style.display = 'none';
+  roleChip.hidden = false;
+  roleChip.textContent = snap.role === 'viewer' ? tr('İzleyici: yalnızca görüntüleyebilirsin') : tr('Düzenleyici (uzaktan)');
+  roleChip.className = `chip ${snap.role === 'viewer' ? 'warn' : 'good'}`;
 }
 
 function show(id, params) {
@@ -129,18 +141,22 @@ async function start() {
       return;
     }
     setSnapshot(snap);
+    applyRole(snap);
   });
   on('vault', () => { instances.clear(); show(current); });  // another vault: forget selections
+  on('auth_lost', () => clear(content).append(h('div', { class: 'empty' }, tr('Davet geçersiz ya da erişim kapatıldı. Burrow sahibinden yeni bağlantı iste.'))));
   try {
     setSnapshot(await call('bootstrap'));
   } catch (e) {
     showError(e);
+    if (isRemote) clear(content).append(h('div', { class: 'empty' }, tr(e.message)));
     return;
   }
+  applyRole(state.snap);
   const wanted = sessionStorage.getItem('burrow.page') || state.snap.start_page;
   sessionStorage.removeItem('burrow.page');
   show(PAGES.some((p) => p.id === wanted) ? wanted : 'overview');
-  if (state.snap.needs_vault) openVaultPicker({ required: true });  // first start: no vault yet
+  if (state.snap.needs_vault && !isRemote) openVaultPicker({ required: true });  // first start: no vault yet
 }
 
 start();

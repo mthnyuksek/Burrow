@@ -9,6 +9,7 @@
 #include "Core/json.h"
 #include "Core/markdown_file.h"
 #include "Core/platform.h"
+#include "Core/remote_config.h"
 #include "Core/run_manager.h"
 #include "Core/run_record.h"
 #include "Core/run_stats.h"
@@ -360,6 +361,28 @@ void TestTelegramConfig() {
     fsx::RemoveDirRecursive(dir);
 }
 
+void TestRemoteConfig() {
+    const std::string dir = FreshDir("burrow_selftest_remote");
+    fsx::MakeDirs(dir);
+    const std::string file = fsx::Join(dir, "remote.ini");
+    CHECK(RemoteConfig::Load(file).invites.empty());
+    RemoteConfig c;
+    c.invites.push_back({"a1", "viewer", "0123456789abcdef0123", "Ali | Veli", 0});
+    c.invites.push_back({"b2", "editor", "fedcba9876543210fedc", "Ayşe", 0});
+    CHECK(c.Save(file));
+    const RemoteConfig back = RemoteConfig::Load(file);
+    CHECK(back.invites.size() == 2 && back.Find("b2") && back.Find("b2")->role == "editor");
+    CHECK(back.Find("a1")->name == "Ali   Veli" && back.Find("zz") == nullptr);  // '|' cannot break the line format
+    // Roles: the viewer only reads, the editor does everything except the owner's own setup.
+    CHECK(RemoteRoleAllows("viewer", "chats.list") && RemoteRoleAllows("viewer", "bootstrap"));
+    CHECK(!RemoteRoleAllows("viewer", "chat.send") && !RemoteRoleAllows("viewer", "agent.save"));
+    CHECK(RemoteRoleAllows("editor", "chat.send") && RemoteRoleAllows("editor", "skill.save"));
+    CHECK(!RemoteRoleAllows("editor", "settings.set") && !RemoteRoleAllows("editor", "vault.open"));
+    CHECK(!RemoteRoleAllows("editor", "remote.invite") && !RemoteRoleAllows("editor", "telegram.set"));
+    CHECK(!RemoteRoleAllows("editor", "scheduler.set") && !RemoteRoleAllows("stranger", "chats.list"));
+    fsx::RemoveDirRecursive(dir);
+}
+
 void TestWeekdayWakeups() {
     Wakeup w;
     CHECK(Wakeup::Parse("Mon,wed 09:00 | t | p", w) && w.days == 5 && w.time == "09:00" && w.task_id == "t" &&
@@ -681,6 +704,7 @@ int main(int argc, char** argv) {
     TestSkillTemplates();
     TestVaultLanguage();
     TestTelegramConfig();
+    TestRemoteConfig();
     TestProjects();
     TestUsageStats();
     TestReplyParsing();

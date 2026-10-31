@@ -4,6 +4,7 @@
 #include "Core/skill_templates.h"
 #include "Core/text.h"
 #include "Ui/folder_dialog.h"
+#include "Ui/remote_server.h"
 #include "Ui/telegram_client.h"
 #include "Ui/web_frame.h"
 #include "Ui/web_json.h"
@@ -126,6 +127,50 @@ Json WebFrame::Dispatch(const std::string& cmd, const Json& args) {
     if (cmd == "vault.remove") {
         registry_.Remove(WStr(args["path"]));  // the folder itself is left untouched
         return Json();
+    }
+
+    // Friends joining over the internet (owner only: RemoteRoleAllows keeps "remote." from them).
+    if (cmd == "remote.set") {
+        SetRemote(args["on"].AsBool());
+        return Json();
+    }
+    if (cmd == "remote.install") {
+        tunnel_.Install();
+        PushChanged();
+        return Json();
+    }
+    if (cmd == "remote.invite") {
+        const std::string name = Trimmed(args["name"]);
+        const std::string role = WStr(args["role"]);
+        Require(!name.empty(), "Davet için bir isim yaz.");
+        Require(role == "viewer" || role == "editor", "Rol geçersiz.");
+        RemoteInvite invite;
+        invite.name = name;
+        invite.role = role;
+        invite.token = RemoteServer::NewToken();
+        invite.id = RemoteServer::NewToken().substr(0, 8);
+        remote_config_.invites.push_back(invite);
+        Require(remote_config_.Save(RemoteFile()), "Davet kaydedilemedi.");
+        remote_.SetInvites(remote_config_.invites);
+        PushChanged();
+        return IdJson(invite.id);
+    }
+    if (cmd == "remote.revoke") {
+        auto& list = remote_config_.invites;
+        const std::string id = WStr(args["id"]);
+        list.erase(std::remove_if(list.begin(), list.end(), [&](const RemoteInvite& i) { return i.id == id; }),
+                   list.end());
+        remote_config_.Save(RemoteFile());
+        remote_.SetInvites(list);  // the friend is locked out from the next call on
+        PushChanged();
+        return Json();
+    }
+    if (cmd == "remote.link") {
+        const RemoteInvite* invite = remote_config_.Find(WStr(args["id"]));
+        Require(invite != nullptr, "Davet bulunamadı.");
+        Json j = Json::MakeObject();
+        j.Set("link", JStr(InviteLink(*invite)));
+        return j;
     }
 
     if (cmd == "telegram.set") {  // an empty token keeps the saved one

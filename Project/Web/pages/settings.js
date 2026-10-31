@@ -2,7 +2,7 @@
 // language, run limits (concurrency, agent chain length, default model) and the vault-wide token budget.
 import { call } from '../api.js';
 import { tr, lang } from '../i18n.js';
-import { h, field, selectInput, showError, toast, button, fmtTokens } from '../ui.js';
+import { h, field, selectInput, showError, toast, button, fmtTokens, confirmBox, clockTime } from '../ui.js';
 import { kv } from '../master_detail.js';
 
 export default function create() {
@@ -73,12 +73,71 @@ export default function create() {
     h('div', { style: { display: 'flex', gap: '8px', marginTop: '10px' } },
       button(tr('Kaydet'), { kind: 'primary', onClick: tgSave }), button(tr('Test mesajı gönder'), { onClick: tgTest })));
 
+  // Remote access: friends join from their own browser through a link (viewer = look, editor = also command
+  // agents and create agents / skills / tasks). A free Cloudflare tunnel gives the address; the switch below
+  // closes the server and the tunnel at once.
+  const remoteOn = h('input', { type: 'checkbox' });
+  remoteOn.addEventListener('change', () => {
+    call('remote.set', { on: remoteOn.checked }).catch((e) => { remoteOn.checked = !remoteOn.checked; showError(e); });
+  });
+  const remoteStatus = h('div', { class: 'hint' });
+  const remoteInstall = button(tr('cloudflared\'ı indir (yaklaşık 40 MB)'), { onClick: () => call('remote.install').catch(showError) });
+  const inviteName = h('input', { type: 'text', placeholder: tr('örn. Ali') });
+  const inviteRole = selectInput([['viewer', tr('İzleyici (yalnızca görür)')], ['editor', tr('Düzenleyici (komut verir, ajan/yetenek oluşturur)')]], 'viewer');
+  const inviteList = h('div', { style: { display: 'grid', gap: '8px', margin: '10px 0' } });
+  async function copyLink(id) {
+    try {
+      const { link } = await call('remote.link', { id });
+      await navigator.clipboard.writeText(link);
+      toast(tr('Davet bağlantısı kopyalandı. Yalnızca o kişiye gönder.'));
+    } catch (e) { showError(e); }
+  }
+  async function revoke(inv) {
+    if (!await confirmBox(tr('{n} adlı kişinin erişimi hemen kapatılacak.', { n: inv.name }), tr('İptal et'))) return;
+    call('remote.revoke', { id: inv.id }).catch(showError);
+  }
+  async function invite() {
+    try {
+      await call('remote.invite', { name: inviteName.value, role: inviteRole.value });
+      inviteName.value = '';
+    } catch (e) { showError(e); }
+  }
+  const remoteCard = h('div', { class: 'card' },
+    h('div', { class: 'card-head' }, h('h3', null, tr('Uzaktan erişim'))),
+    h('div', { class: 'hint', style: { marginBottom: '10px' } }, tr('Arkadaşın kendi tarayıcısından bu Burrow\'a bağlanır. Bağlantı adresini Burrow kendisi üretir (ücretsiz Cloudflare tüneli, hesap gerekmez). Anahtarı kapattığında sunucu ve tünel hemen kapanır; uygulamayı yeniden açınca kapalı başlar.')),
+    h('label', { class: 'check-row' }, remoteOn, ' ', tr('Arkadaşların bağlanabilsin (sunucu açık)')),
+    remoteStatus, remoteInstall,
+    h('div', { class: 'hint', style: { margin: '12px 0 4px' } }, tr('Davetler')),
+    inviteList,
+    field(tr('Kişi adı'), inviteName),
+    field(tr('Rol'), inviteRole),
+    button(tr('Davet oluştur'), { kind: 'primary', onClick: invite }),
+    h('div', { class: 'hint', style: { marginTop: '10px' } }, tr('Dikkat: Düzenleyici, senin adına ajanlara komut verebilir ve yeni ajan/yetenek oluşturabilir. "Terminal komutları" gibi yetenekler bu bilgisayarda komut çalıştırır; düzenleyiciyi yalnızca çok güvendiğin kişiye ver. Ayarlar, kasa değiştirme ve Telegram yalnızca sende kalır.')));
+
+  function renderRemote(r) {
+    remoteOn.checked = r.on;
+    remoteInstall.style.display = r.installed ? 'none' : '';
+    remoteInstall.disabled = r.tunnel_state === 'installing';
+    remoteStatus.textContent = r.tunnel_state === 'installing' ? tr('cloudflared indiriliyor...')
+      : !r.installed ? tr('Internetten erişim için önce cloudflared programı gerekli (Cloudflare\'ın resmi tüneli). Kurulduktan sonra anahtarı aç.')
+      : r.tunnel_state === 'on' ? tr('Adres hazır: {u}. Davetin yanındaki "Bağlantıyı kopyala" ile arkadaşına gönder.', { u: r.tunnel_url })
+      : r.tunnel_state === 'starting' ? tr('Tünel açılıyor...')
+      : r.tunnel_state === 'error' ? tr('Tünel hatası: {e}', { e: r.tunnel_message })
+      : r.on ? tr('Sunucu açık ama tünel yok.') : tr('Kapalı.');
+    inviteList.replaceChildren(...(r.invites.length ? r.invites.map((inv) => h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+      h('div', { style: { flex: '1' } }, h('b', null, inv.name), ' ', h('span', { class: 'chip plain' }, inv.role === 'editor' ? tr('Düzenleyici') : tr('İzleyici')),
+        inv.last_seen ? h('div', { class: 'hint' }, tr('Son görülme: {t}', { t: clockTime(inv.last_seen) })) : null),
+      button(tr('Bağlantıyı kopyala'), { small: true, onClick: () => copyLink(inv.id) }),
+      button(tr('İptal et'), { small: true, kind: 'danger', onClick: () => revoke(inv) })))
+      : [h('div', { class: 'hint' }, tr('Henüz davet yok.'))]));
+  }
+
   const el = h('div', { style: { display: 'grid', gap: '18px', maxWidth: '640px', alignContent: 'start' } },
     h('div', { class: 'card' },
       h('div', { class: 'card-head' }, h('h3', null, tr('Dil'))),
       field(tr('Arayüz dili'), language,
         tr('Bu ayar kasanın vault.ini dosyasında saklanır. "Kasa ayarlarını düzenleme" yeteneği olan bir ajan da değiştirebilir. Değişince sayfa yenilenir.'))),
-    limitsCard, budgetCard, telegramCard,
+    limitsCard, budgetCard, telegramCard, remoteCard,
     h('div', { class: 'card' }, info));
 
   return {
@@ -91,6 +150,7 @@ export default function create() {
         concurrent.value = v.max_concurrent; hops.value = v.max_hops; model.value = v.default_model;
         daily.value = v.daily_budget; weekly.value = v.weekly_budget;
       }
+      renderRemote(snap.remote);
       const tg = snap.telegram;
       const tgSig = JSON.stringify([tg.chat_id, tg.notify_failures, tg.receive, tg.agent_id, snap.agents.map((a) => a.id)]);
       if (tgSig !== tgLoaded && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {

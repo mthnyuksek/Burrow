@@ -9,6 +9,8 @@
 #include <dwmapi.h>
 
 #include <algorithm>
+#include <chrono>
+#include <future>
 #include <map>
 #include <thread>
 
@@ -49,6 +51,19 @@ WebFrame::WebFrame(VaultRegistry& registry, const Vault* vault, const std::strin
     runs_.on_changed = [this] { OnRunsChanged(); };
     runs_.on_finished = [this](const RunResult& r) { OnRunFinished(r); };
     telegram_ = TelegramConfig::Load(TelegramFile());
+    remote_config_ = RemoteConfig::Load(RemoteFile());
+    remote_.on_api = [this](const RemoteInvite& who, const std::string& body, const std::atomic<bool>& stop) {
+        // Runs on a server thread: hand the command to the UI thread and wait for its answer.
+        auto answer = std::make_shared<std::promise<std::string>>();
+        std::future<std::string> result = answer->get_future();
+        Post([this, who, body, answer] { answer->set_value(HandleRemote(who, body)); });
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+        while (result.wait_for(std::chrono::milliseconds(200)) != std::future_status::ready) {
+            if (stop || std::chrono::steady_clock::now() > deadline)
+                return std::string("{\"ok\":false,\"error\":\"Burrow şu an yanıt veremiyor, tekrar dene.\"}");
+        }
+        return result.get();
+    };
     if (HasVault())
         StartVaultMachinery();
 }
@@ -58,6 +73,9 @@ WebFrame::~WebFrame() {
     runs_.on_finished = nullptr;
     if (poller_)
         poller_->stop = true;
+    tunnel_.Stop();
+    remote_.on_api = nullptr;
+    remote_.Stop();  // before the window goes: server threads post work to it
     SetThreadExecutionState(ES_CONTINUOUS);
     if (hwnd_) {
         SetWindowLongPtrW(hwnd_, GWLP_USERDATA, 0);
@@ -173,8 +191,10 @@ LRESULT WebFrame::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
             return 0;
         }
         case WM_TIMER:
-            if (wparam == kRunTimerId)
+            if (wparam == kRunTimerId) {
                 runs_.Tick();
+                CheckTunnel();
+            }
             else if (wparam == kSchedulerTimerId)
                 OnSchedulerTick();
             return 0;
@@ -235,6 +255,7 @@ void WebFrame::Push(const std::string& event, Json data) {
     msg.Set("event", JStr(event));
     msg.Set("data", std::move(data));
     host_.PostToPage(msg.Dump());
+    remote_.NotifyChanged();  // friends' pages poll for this
 }
 
 void WebFrame::PushChanged() { Push("changed", Snapshot()); }
@@ -341,7 +362,11 @@ Json WebFrame::Snapshot() const {
         std::lock_guard<std::mutex> lock(telegram_status_->mutex);
         tg.Set("last_error", JStr(telegram_status_->last_error));
     }
+    if (caller_role_ != "owner")
+        tg.Set("chat_id", JStr(""));  // friends do not need the owner's Telegram details
     out.Set("telegram", tg);
+    out.Set("role", JStr(caller_role_));
+    out.Set("remote", RemoteJson());
 
     Json jobs = Json::MakeArray();
     for (const JobInfo& i : runs_.Jobs()) {
@@ -754,4 +779,114 @@ void WebFrame::OnSchedulerTick() {
         if (!due.wakeup.date.empty())
             RemoveWakeup(agent->id, due.wakeup);  // one-time: done
     }
+}
+
+// --- Friends joining over the internet -----------------------------------------------------------
+
+std::string WebFrame::RemoteFile() const { return fsx::Join(fsx::UserDataDir(), "remote.ini"); }
+
+namespace {
+const char* TunnelStateName(Tunnel::State state) {
+    switch (state) {
+        case Tunnel::State::Installing: return "installing";
+        case Tunnel::State::Starting: return "starting";
+        case Tunnel::State::On: return "on";
+        case Tunnel::State::Error: return "error";
+        default: return "off";
+    }
+}
+}  // namespace
+
+Json WebFrame::RemoteJson() const {
+    Json out = Json::MakeObject();
+    const Tunnel::Status tunnel = tunnel_.Get();
+    out.Set("on", JBool(remote_.Running()));
+    out.Set("installed", JBool(Tunnel::Installed()));
+    out.Set("tunnel_state", JStr(TunnelStateName(tunnel.state)));
+    out.Set("tunnel_url", JStr(tunnel.url));
+    out.Set("tunnel_message", JStr(tunnel.message));
+    Json invites = Json::MakeArray();
+    if (caller_role_ == "owner") {  // the tokens never go to the page; the owner asks for a link per invite
+        const std::map<std::string, long> seen = remote_.LastSeen();
+        for (const RemoteInvite& i : remote_config_.invites) {
+            Json j = Json::MakeObject();
+            j.Set("id", JStr(i.id));
+            j.Set("name", JStr(i.name));
+            j.Set("role", JStr(i.role));
+            const auto it = seen.find(i.id);
+            j.Set("last_seen", JNum(it == seen.end() ? 0 : static_cast<double>(it->second)));
+            invites.Push(j);
+        }
+    }
+    out.Set("invites", invites);
+    return out;
+}
+
+std::string WebFrame::InviteLink(const RemoteInvite& invite) const {
+    const Tunnel::Status tunnel = tunnel_.Get();
+    if (tunnel.state != Tunnel::State::On)
+        throw ApiError("Bağlantı adresi henüz hazır değil. Tünelin açılmasını bekle.");
+    return tunnel.url + "/#t=" + invite.token;
+}
+
+void WebFrame::SetRemote(bool on) {
+    if (!on) {
+        tunnel_.Stop();
+        remote_.Stop();
+        PushChanged();
+        return;
+    }
+    std::string error;
+    if (!remote_.Running() && !remote_.Start(remote_config_.invites, error))
+        throw ApiError(error);
+    if (Tunnel::Installed())
+        tunnel_.Start(remote_.Port());
+    PushChanged();
+}
+
+void WebFrame::CheckTunnel() {
+    const Tunnel::Status t = tunnel_.Get();
+    const std::string sig = std::string(TunnelStateName(t.state)) + t.url + t.message;
+    if (sig == last_tunnel_sig_)
+        return;
+    last_tunnel_sig_ = sig;
+    PushChanged();
+}
+
+// A friend's command, on the UI thread. The role decides what is allowed; the invite may have been
+// revoked while the request was on its way.
+std::string WebFrame::HandleRemote(const RemoteInvite& who, const std::string& body) {
+    Json msg;
+    Json reply = Json::MakeObject();
+    if (!Json::Parse(body, msg) || !msg.IsObject()) {
+        reply.Set("ok", JBool(false));
+        reply.Set("error", JStr("Geçersiz istek."));
+        return reply.Dump();
+    }
+    reply.Set("id", msg["id"]);
+    struct RoleGuard {
+        std::string& role;
+        RoleGuard(std::string& r, const std::string& value) : role(r) { role = value; }
+        ~RoleGuard() { role = "owner"; }
+    };
+    try {
+        const std::string cmd = msg["cmd"].AsString();
+        const RemoteInvite* current = remote_config_.Find(who.id);
+        if (!current || current->token != who.token)
+            throw ApiError("Davet iptal edildi.");
+        if (!RemoteRoleAllows(current->role, cmd))
+            throw ApiError("Bu işlem için yetkin yok.");
+        Json args = msg["args"];
+        if (cmd == "chat.send")  // the agent should know it is not the owner talking
+            args.Set("text", JStr("(" + current->name + " yazıyor) " + WStr(args["text"])));
+        RoleGuard guard(caller_role_, current->role);
+        reply.Set("data", Dispatch(cmd, args));
+        reply.Set("ok", JBool(true));
+    } catch (const std::exception& e) {
+        reply = Json::MakeObject();
+        reply.Set("id", msg["id"]);
+        reply.Set("ok", JBool(false));
+        reply.Set("error", JStr(std::string(e.what())));
+    }
+    return reply.Dump();
 }
