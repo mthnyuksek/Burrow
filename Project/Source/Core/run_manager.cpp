@@ -467,7 +467,10 @@ void RunManager::HandleLine(Active* a, const std::string& line) {
                                      u["cache_creation_input_tokens"].AsNumber() +
                                      u["cache_read_input_tokens"].AsNumber());
         r.status = j["is_error"].AsBool() ? RunStatus::Failed : RunStatus::Done;
-        if (r.status == RunStatus::Failed && r.text.empty())
+        if (r.status == RunStatus::Failed && j["subtype"].AsString() == "error_max_turns")
+            r.text = "Ajan adım sınırına (" + std::to_string(a->job.max_turns) +
+                     ") takıldı ve işi bitiremedi. Sohbette \"devam et\" yazarak kaldığı yerden sürdürebilirsin.";
+        else if (r.status == RunStatus::Failed && r.text.empty())
             r.text = j["subtype"].AsString();
     }
 }

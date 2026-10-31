@@ -148,7 +148,7 @@ RunJob MakeChatJob(const TeamContext& team, const AgentDefinition& agent, const 
     }
     job.resume_session = session_id;
     job.persist_session = true;  // chats continue the same Claude session, which keeps them cheap
-    job.max_turns = 12;
+    job.max_turns = 40;
     job.priority = kPriorityHigh;  // somebody is waiting for the answer
     return job;
 }
@@ -157,7 +157,7 @@ RunJob MakeTaskJob(const TeamContext& team, const AgentDefinition& agent, const 
                    JobSource source, const std::string& project_id) {
     RunJob job = BaseJob(team, agent, nullptr, Asked::No, project_id);
     job.source = source;
-    job.max_turns = 15;
+    job.max_turns = 40;
     if (task) {
         job.task_name = task->name;
         job.prompt = task->body;
@@ -181,7 +181,7 @@ RunJob MakeAgentMessageJob(const TeamContext& team, const AgentDefinition& to, c
     job.expects_reply = expects_reply;
     job.hops = hops;
     job.prompt = from.name + " yazdı:\n" + body;
-    job.max_turns = 8;
+    job.max_turns = 25;
     return job;
 }
 
@@ -196,7 +196,7 @@ RunJob MakeReportJob(const TeamContext& team, const AgentDefinition& agent, cons
                  "\n\nBu sonucu değerlendir ve işi isteyen kişiye kısaca bildir.";
     job.resume_session = session_id;
     job.persist_session = !session_id.empty();
-    job.max_turns = 8;
+    job.max_turns = 25;
     return job;
 }
 

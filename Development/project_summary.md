@@ -60,7 +60,7 @@ Page -> program: `chrome.webview.postMessage({id, cmd, args})`, answered `{id, o
 - Chats tab filters (kind: all / mine / agents only, agent, project, text search) live in `Web/pages/chats.js`, which receives all conversations and shows the ones that pass. Chats can be renamed (a `title` line is appended to the .jsonl, newest wins) and exported as Markdown.
 
 ## Token saving (the point of the project)
-- Lean profile for every call: `--system-prompt-file`, `--tools <only skill tools>`, `--strict-mcp-config`, `--disable-slash-commands`, `--setting-sources project`, `--permission-prompts none`, `--max-turns`. Default call is ~25k tokens, lean ~3.3k, with no tools ~0.7k. Each built-in tool costs ~0.9k.
+- Lean profile for every call: `--system-prompt-file`, `--tools <only skill tools>`, `--strict-mcp-config`, `--disable-slash-commands`, `--setting-sources project`, `--permission-prompts none`, `--max-turns` (chat/task 40, agent message/report 25; `error_max_turns` gives a clear "write devam et" message, the session is kept so the chat can continue). Default call is ~25k tokens, lean ~3.3k, with no tools ~0.7k. Each built-in tool costs ~0.9k.
 - Usage comes from the `rate_limit_event` line (5-hour and 7-day windows, `utilization` 0..1). A tiny Haiku probe measures it at startup and on "Yenile".
 - Chats resume one Claude session; keep prompts, rules and persona short because they are paid on every run.
 
