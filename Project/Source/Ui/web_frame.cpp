@@ -258,7 +258,15 @@ void WebFrame::Push(const std::string& event, Json data) {
     remote_.NotifyChanged();  // friends' pages poll for this
 }
 
-void WebFrame::PushChanged() { Push("changed", Snapshot()); }
+void WebFrame::PushChanged() {
+    // This goes to the owner's window. It can be called while a friend's command runs (caller_role_ is the
+    // friend's role then), so the snapshot is always built as the owner's, or the owner's page would hide Settings.
+    const std::string saved_role = caller_role_;
+    caller_role_ = "owner";
+    Json snapshot = Snapshot();
+    caller_role_ = saved_role;
+    Push("changed", std::move(snapshot));
+}
 
 // --- State ----------------------------------------------------------------------------------
 
